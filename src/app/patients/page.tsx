@@ -49,6 +49,8 @@ function getStringValue(val: any): string {
   return String(val).toLowerCase();
 }
 
+
+
 export default function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -229,27 +231,46 @@ export default function PatientsPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPatients.map((patient, index) => (
-                  <tr 
-                    key={patient.id || index}
-                    className="bg-blue-50 cursor-pointer border-b border-blue-100 h-8"
-                    onClick={() => patient.id && router.push(`/patients/${patient.id}`)}
-                  >
-                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-500">
-                      {index + 1}
-                    </td>
-                    {TABLE_FIELDS.map(field => (
-                      <td 
-                        key={`${patient.id}-${field.key}`}
-                        className={`px-2 py-1 text-xs whitespace-nowrap ${
-                          field.key === 'Name' ? 'font-medium text-[#2b6cb0]' : 'text-gray-700'
-                        } ${field.key === 'DFN' ? 'font-mono' : ''}`}
-                      >
-                        {patient[field.key as keyof Patient] || '-'}
+                {filteredPatients.map((patient, index) => {
+                  const handleRowClick = (e: React.MouseEvent) => {
+                    // Don't navigate if clicking on a link or button
+                    const target = e.target as HTMLElement;
+                    if (target.tagName === 'A' || target.tagName === 'BUTTON' || target.closest('a, button')) {
+                      return;
+                    }
+                    if (patient.DFN) {
+                      router.push(`/patients/${patient.DFN}`);
+                    }
+                  };
+
+                  return (
+                    <tr 
+                      key={patient.DFN || index}
+                      className="bg-blue-50 border-b border-blue-100 h-8 hover:bg-blue-100 transition-colors cursor-pointer"
+                      onClick={handleRowClick}
+                    >
+                      <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-500">
+                        {index + 1}
                       </td>
-                    ))}
-                  </tr>
-                ))}
+                      {TABLE_FIELDS.map(field => {
+                        const value = patient[field.key as keyof Patient] || '-';
+                        const isName = field.key === 'Name';
+                        const isId = field.key === 'DFN';
+                        
+                        return (
+                          <td 
+                            key={`${patient.DFN}-${field.key}`}
+                            className={`px-2 py-1 text-xs whitespace-nowrap ${
+                              isName ? 'font-medium text-[#2b6cb0]' : 'text-gray-700'
+                            } ${isId ? 'font-mono' : ''}`}
+                          >
+                            {String(value)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  )
+                })}
                 {filteredPatients.length === 0 && (
                   <tr>
                     <td colSpan={TABLE_FIELDS.length + 1} className="px-6 py-4 text-center text-sm text-gray-500">
