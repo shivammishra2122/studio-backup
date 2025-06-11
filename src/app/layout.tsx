@@ -1,21 +1,10 @@
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
-import { Toaster } from "@/components/ui/toaster";
-import type { Patient } from '@/lib/constants';
-import ClientLayout from '@/components/layout/client-layout';
+import ClientProviders from '@/components/providers/client-providers';
 
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
-
-const mockPatients: Patient[] = [
+// Mock patient data for development
+// @ts-ignore - Mock data for development only
+const mockPatients: any[] = [
   {
     id: '900752869578',
     name: 'Sarah Miller',
@@ -162,6 +151,16 @@ const patientData = {
   },
 };
 
+const geistSans = Geist({
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
+});
+
+const geistMono = Geist_Mono({
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
+});
+
 export default function RootLayout({
   children,
 }: {
@@ -170,13 +169,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}>
-        <ClientLayout
-          mockPatients={mockPatients}
-          patientData={patientData}
-        >
+        <ClientProviders>
           {children}
-        </ClientLayout>
-        <Toaster />
+        </ClientProviders>
       </body>
     </html>
   );

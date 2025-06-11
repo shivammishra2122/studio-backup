@@ -1,33 +1,47 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useState, useMemo, useCallback } from "react";
-import { api, Patient } from "@/services/api";
-import { useToast } from "@/hooks/use-toast";
+import { useMemo, useCallback, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { PatientSearch } from "@/components/patient/patient-search";
 import { 
   User, 
-  Calendar, 
+  Calendar as CalendarIcon,
+  Calendar,
   Clock, 
   Home, 
   Bed, 
   Stethoscope, 
   UserCog, 
   CreditCard, 
-  FileText, 
-  AlertTriangle, 
+  FileText,
   ChevronDown, 
   ChevronUp,
   Loader2,
-  RefreshCw
-} from "lucide-react";
+  AlertTriangle,
+  RefreshCw as RefreshCwIcon,
+  Search as SearchIcon
+ } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePatients } from "@/context/patient-context";
+import { usePatientActions } from "@/hooks/use-patient-actions";
+import { format } from "date-fns";
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 
 type SortDirection = 'asc' | 'desc';
 
-const TABLE_FIELDS = [
+type TableFieldKey = 'DFN' | 'Name' | 'Age' | 'Admission Date' | 'LOS' | 'Ward' | 'Bed' | 'Specialty' | 'Primary Consultant' | 'Payer Category' | 'Type of Admission' | 'MLC';
+
+interface TableField {
+  key: TableFieldKey;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+const TABLE_FIELDS: TableField[] = [
   { key: 'DFN', label: 'Patient ID', icon: FileText },
   { key: 'Name', label: 'Patient Name', icon: User },
   { key: 'Age', label: 'Age/Gender', icon: UserCog },
@@ -40,248 +54,312 @@ const TABLE_FIELDS = [
   { key: 'Payer Category', label: 'Payer', icon: CreditCard },
   { key: 'Type of Admission', label: 'Admission Type', icon: FileText },
   { key: 'MLC', label: 'MLC', icon: AlertTriangle },
-] as const;
-
-type TableFieldKey = typeof TABLE_FIELDS[number]['key'];
+];
 
 function getStringValue(val: any): string {
-  if (val === undefined || val === null) return '';
-  return String(val).toLowerCase();
+  if (val == null) return '-';
+  return String(val);
 }
 
-
-
 export default function PatientsPage() {
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [searchOption, setSearchOption] = useState("Appointment's");
-  const [sortKey, setSortKey] = useState<TableFieldKey | null>(null);
+  const { patients, loading, error, fetchPatients } = usePatients();
+  const [sortKey, setSortKey] = useState<TableFieldKey>('Name');
   const [sortDir, setSortDir] = useState<SortDirection>('asc');
-  const { toast } = useToast();
   const router = useRouter();
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState('Default');
 
-  const handleSearch = useCallback(() => {
-    console.log('Search triggered with:', { search, searchOption });
-  }, [search, searchOption]);
+  // Advanced search dialog state
+  const [isAdvOpen, setIsAdvOpen] = useState(false);
+  const [advName, setAdvName] = useState('');
+  const [advDob, setAdvDob] = useState('');
+  const [advPhone, setAdvPhone] = useState('');
+  const [advIp, setAdvIp] = useState('');
 
-  const handleSearchOptionChange = useCallback((option: string) => {
-    setSearchOption(option);
-    setSearch(""); // Reset search when changing search option
-  }, []);
+  // Fetch patients on initial load
+  useEffect(() => {
+    const loadPatients = async () => {
+      try {
+        await fetchPatients({});
+        setLastUpdated(new Date());
+      } catch (err) {
+        console.error('Failed to load patients:', err);
+      }
+    };
+
+    loadPatients();
+  }, [fetchPatients]);
+
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      await fetchPatients({});
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error('Failed to refresh patients:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleAdvancedSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const params: Record<string, any> = {};
+    if (advName) params.name = advName;
+    if (advDob) params.dob = advDob;
+    if (advPhone) params.phone = advPhone;
+    if (advIp) params.ipno = advIp;
+    await fetchPatients(params);
+    setIsAdvOpen(false);
+  };
 
   const handleSort = useCallback((key: TableFieldKey) => {
     if (sortKey === key) {
-      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+      setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(key);
       setSortDir('asc');
     }
-  }, [sortKey, sortDir]);
-
-  useEffect(() => {
-    const fetchPatients = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await api.getPatients();
-        if (Array.isArray(data)) {
-          setPatients(data as Patient[]);
-        } else {
-          setError('Invalid data format received from server');
-          setPatients([]);
-        }
-      } catch (error) {
-        setError('Failed to fetch patients. Please try again.');
-        setPatients([]);
-        toast({
-          title: "Error",
-          description: "Failed to fetch patients. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPatients();
-  }, [toast]);
+  }, [sortKey]);
 
   const filteredPatients = useMemo(() => {
-    let filtered = [...patients];
+    if (!searchQuery) return patients;
     
-    // Apply search filter
-    if (search.trim() !== "") {
-      const searchLower = search.toLowerCase();
-      filtered = filtered.filter(patient => 
-        Object.values(patient).some(val => 
-          String(val).toLowerCase().includes(searchLower)
-        )
-      );
-    }
-
-    // Apply sorting
-    if (sortKey) {
-      filtered.sort((a, b) => {
-        const aVal = getStringValue(a[sortKey as keyof Patient]);
-        const bVal = getStringValue(b[sortKey as keyof Patient]);
-        if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
-        return 0;
-      });
-    }
-
-    return filtered;
-  }, [patients, search, sortKey, sortDir]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <span className="ml-2">Loading patients...</span>
-      </div>
+    const query = searchQuery.toLowerCase();
+    return patients.filter(patient => 
+      Object.values(patient).some(
+        val => val && String(val).toLowerCase().includes(query)
+      )
     );
-  }
+  }, [patients, searchQuery]);
+
+  const sortedPatients = useMemo(() => {
+    if (!sortKey) return filteredPatients;
+
+    return [...filteredPatients].sort((a, b) => {
+      // Use type assertion to access dynamic properties
+      const aValue = (a as any)[sortKey] || '';
+      const bValue = (b as any)[sortKey] || '';
+      
+      if (aValue < bValue) return sortDir === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredPatients, sortKey, sortDir]);
+
+  const handleRowClick = useCallback((e: React.MouseEvent, patient: any) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'A' || target.tagName === 'BUTTON' || target.closest('a, button')) {
+      return;
+    }
+    if (patient.DFN) {
+      router.push(`/patients/${patient.DFN}`);
+    }
+  }, [router]);
 
   if (error) {
     return (
-      <div className="container mx-auto py-6 px-4">
-        <div className="flex flex-col space-y-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold">Patient List</h1>
-            <Button onClick={() => window.location.reload()} disabled={loading}>
-              {loading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              Try Again
-            </Button>
-          </div>
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <AlertTriangle className="h-5 w-5 text-red-500" />
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+        <AlertTriangle className="h-12 w-12 text-red-500 mb-4" />
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">Error Loading Patients</h2>
+        <p className="text-gray-600 mb-6">Failed to load patient data. Please try again.</p>
+        <Button 
+          variant="outline" 
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="flex items-center gap-2"
+        >
+          {isRefreshing ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCwIcon className="h-4 w-4" />
+          )}
+          Try Again
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white p-2 md:p-4 lg:p-4">
-      <div className="max-w-7xl mx-auto space-y-3">
-        {/* Header */}
-        <div className="flex flex-col">
+    <div className="w-full px-4 py-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col">
+        <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold text-[#2d3748]">Patient List</h1>
-          <p className="text-xs text-gray-600">
-            {filteredPatients.length} {filteredPatients.length === 1 ? 'patient' : 'patients'} found
-            {search && ` matching "${search}"`}
-          </p>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-1.5 text-xs h-8"
+          >
+            {isRefreshing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCwIcon className="h-3.5 w-3.5" />
+            )}
+            Refresh
+          </Button>
         </div>
-        
-        {/* Patient Search Section */}
-        <PatientSearch
-          search={search}
-          onSearchChange={setSearch}
-          onSearchOptionChange={handleSearchOptionChange}
-          onSearch={handleSearch}
-        />
+        <p className="text-xs text-gray-600">
+          {filteredPatients.length} {filteredPatients.length === 1 ? 'patient' : 'patients'} found
+          {searchQuery && ` matching "${searchQuery}"`}
+        </p>
+      </div>
+      
+      {/* Category section (left) + Search section (right) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+        <RadioGroup
+          value={filterCategory}
+          onValueChange={setFilterCategory}
+          className="flex flex-wrap gap-x-12 gap-y-2 text-sm md:flex-1"
+        >
+          {['Appointments', "Ward's", "Provider's", 'Emergency', "Team/Personal's", 'Specialties', 'Default', 'New Order Dashboard'].map((cat) => (
+            <div key={cat} className="flex items-center space-x-1.5">
+              <RadioGroupItem value={cat} id={cat} className="h-3.5 w-3.5" />
+              <Label htmlFor={cat} className="text-xs whitespace-nowrap cursor-pointer">
+                {cat}
+              </Label>
+            </div>
+          ))}
+        </RadioGroup>
+
+        {/* Client-side search filter */}
+        <div className="relative max-w-md md:max-w-xs md:flex-shrink-0">
+          <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            placeholder="Filter patients..."
+            className="pl-9 h-9 text-sm border rounded-md w-full px-3 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        {/* Search Buttons */}
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="default" onClick={() => setSearchQuery(searchQuery)} className="h-8 text-xs">Search</Button>
+
+          <Dialog open={isAdvOpen} onOpenChange={setIsAdvOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline" className="h-8 text-xs">Advanced</Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Advanced Patient Search</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAdvancedSearch} className="space-y-3 mt-2">
+                <div className="space-y-1">
+                  <Label htmlFor="adv-name">Name</Label>
+                  <Input id="adv-name" value={advName} onChange={(e) => setAdvName(e.target.value)} placeholder="Last Name, First Name" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="adv-dob">Date of Birth</Label>
+                  <Input id="adv-dob" value={advDob} onChange={(e) => setAdvDob(e.target.value)} placeholder="DD/MM/YYYY" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="adv-phone">Phone No.</Label>
+                  <Input id="adv-phone" value={advPhone} onChange={(e) => setAdvPhone(e.target.value)} placeholder="Phone Number" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="adv-ip">IP No.</Label>
+                  <Input id="adv-ip" value={advIp} onChange={(e) => setAdvIp(e.target.value)} placeholder="IP Number" />
+                </div>
+                <DialogFooter className="mt-4">
+                  <Button type="submit" size="sm">Search</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
         
         {/* Patient Table */}
-        <div className="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-white uppercase tracking-wider bg-[#2c5282]">
-                    #
-                  </th>
-                  {TABLE_FIELDS.map((field) => {
-                    const Icon = field.icon;
-                    return (
-                      <th
-                        key={field.key}
-                        scope="col"
-                        className="px-4 py-2 text-left text-xs font-medium text-white uppercase tracking-wider cursor-pointer bg-[#2c5282] group"
-                        onClick={() => handleSort(field.key)}
-                      >
-                        <div className="flex items-center">
-                          <Icon className="h-4 w-4 mr-1.5 text-blue-300 group-hover:text-white" />
-                          <span className="flex items-center">
-                            {field.label}
-                            {sortKey === field.key && (
-                              sortDir === 'asc' ? (
-                                <ChevronUp className="ml-1 h-4 w-4 text-white" />
-                              ) : (
-                                <ChevronDown className="ml-1 h-4 w-4 text-white" />
-                              )
-                            )}
-                          </span>
-                        </div>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPatients.map((patient, index) => {
-                  const handleRowClick = (e: React.MouseEvent) => {
-                    // Don't navigate if clicking on a link or button
-                    const target = e.target as HTMLElement;
-                    if (target.tagName === 'A' || target.tagName === 'BUTTON' || target.closest('a, button')) {
-                      return;
-                    }
-                    if (patient.DFN) {
-                      router.push(`/patients/${patient.DFN}`);
-                    }
-                  };
-
+      <div className="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-white uppercase tracking-wider bg-[#2c5282]">
+                  #
+                </th>
+                {TABLE_FIELDS.map((field) => {
+                  const Icon = field.icon;
                   return (
-                    <tr 
-                      key={patient.DFN || index}
-                      className="bg-blue-50 border-b border-blue-100 h-8 hover:bg-blue-100 transition-colors cursor-pointer"
-                      onClick={handleRowClick}
+                    <th
+                      key={field.key}
+                      scope="col"
+                      className="px-4 py-2 text-left text-xs font-medium text-white uppercase tracking-wider bg-[#2c5282]"
+                      onClick={() => handleSort(field.key)}
                     >
-                      <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-500">
-                        {index + 1}
-                      </td>
-                      {TABLE_FIELDS.map(field => {
-                        const value = patient[field.key as keyof Patient] || '-';
-                        const isName = field.key === 'Name';
-                        const isId = field.key === 'DFN';
-                        
-                        return (
-                          <td 
-                            key={`${patient.DFN}-${field.key}`}
-                            className={`px-2 py-1 text-xs whitespace-nowrap ${
-                              isName ? 'font-medium text-[#2b6cb0]' : 'text-gray-700'
-                            } ${isId ? 'font-mono' : ''}`}
-                          >
-                            {String(value)}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  )
+                      <div className="flex items-center">
+                        <Icon className="h-4 w-4 mr-1.5 text-blue-300" />
+                        <span className="flex items-center">
+                          {field.label}
+                          {sortKey === field.key && (
+                            sortDir === 'asc' ? (
+                              <ChevronUp className="ml-1 h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronDown className="ml-1 h-3.5 w-3.5" />
+                            )
+                          )}
+                        </span>
+                      </div>
+                    </th>
+                  );
                 })}
-                {filteredPatients.length === 0 && (
-                  <tr>
-                    <td colSpan={TABLE_FIELDS.length + 1} className="px-6 py-4 text-center text-sm text-gray-500">
-                      No patients found
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {loading && !isRefreshing ? (
+                <tr>
+                  <td colSpan={TABLE_FIELDS.length + 1} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                      <p className="text-sm text-gray-500">Loading patients...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : sortedPatients.length === 0 ? (
+                <tr>
+                  <td colSpan={TABLE_FIELDS.length + 1} className="px-6 py-12 text-center">
+                    <p className="text-sm text-gray-500">
+                      {searchQuery ? 'No patients match your search. Try a different term.' : 'No patients found.'}
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                sortedPatients.map((patient, index) => (
+                  <tr 
+                    key={patient.DFN || index} 
+                    className="bg-blue-50 hover:bg-blue-100 transition-colors cursor-pointer"
+                    onClick={(e) => handleRowClick(e, patient)}
+                  >
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {index + 1}
                     </td>
+                    {TABLE_FIELDS.map(field => (
+                      <td 
+                        key={`${patient.DFN}-${field.key}`} 
+                        className="px-4 py-3 whitespace-nowrap text-sm text-gray-900"
+                      >
+                        {getStringValue(patient[field.key as keyof typeof patient])}
+                      </td>
+                    ))}
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
+      </div>
+      
+      {/* Footer */}
+      <div className="flex items-center justify-between text-xs text-gray-500">
+        <p>Showing {sortedPatients.length} of {patients.length} patients</p>
+        <p>Last updated: {lastUpdated.toLocaleString()}</p>
       </div>
     </div>
   );
