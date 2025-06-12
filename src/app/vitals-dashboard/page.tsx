@@ -420,7 +420,7 @@ const VitalsView = () => {
                       </Select>
                     </TableCell>
                   </VitalsTableRow>
-                  <VitalsTableRow className="hover:bg-transparent bg-muted/30">
+                  <VitalsTableRow className="bg-muted/30">
                     <TableCell className="py-1.5 px-3">Pain</TableCell>
                     <TableCell className="py-1.5 px-3"></TableCell>
                     <TableCell className="py-1.5 px-3">
@@ -451,7 +451,7 @@ const VitalsView = () => {
                       </Select>
                     </TableCell>
                   </VitalsTableRow>
-                  <VitalsTableRow className="hover:bg-transparent bg-muted/30">
+                  <VitalsTableRow className="bg-muted/30">
                     <TableCell className="py-1.5 px-3">Height</TableCell>
                     <TableCell className="py-1.5 px-3"></TableCell>
                     <TableCell className="py-1.5 px-3">
@@ -731,9 +731,9 @@ const VitalsView = () => {
                             className={`${index % 2 === 0 ? 'bg-muted/30' : ''} cursor-pointer hover:bg-accent/50 transition-colors ${selectedVitalForGraph === vitalType ? 'ring-2 ring-primary' : ''}`}
                             onClick={() => setSelectedVitalForGraph(vitalType)}
                           >
-                            <TableCell className="py-1.5 px-3 font-medium">{vitalType}</TableCell>
-                            <TableCell className="py-1.5 px-3 text-right">{latestVital?.date || '-'}</TableCell>
-                            <TableCell className="py-1.5 px-3 text-right font-medium">{value}</TableCell>
+                            <TableCell className="py-1.5 px-3 font-medium text-xs">{vitalType}</TableCell>
+                            <TableCell className="py-1.5 px-3 text-right text-xs">{latestVital?.date || '-'}</TableCell>
+                            <TableCell className="py-1.5 px-3 text-right font-medium text-xs">{value}</TableCell>
                           </TableRow>
                         );
                       })
@@ -945,7 +945,7 @@ const IntakeOutputView = () => {
             <Label className="text-sm w-24">
               {isIntake ? 'Intake Date' : 'Output Date'} <span className="text-red-500">*</span>
             </Label>
-            <div className="relative flex-1">
+            <div className="flex-1">
               <Input
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
@@ -1033,7 +1033,7 @@ const IntakeOutputView = () => {
             </div>
           </div>
         </div>
-        <div className="flex justify-center gap-2 p-2 border-t">
+        <div className="flex justify-end space-x-2 mt-auto p-2 border-t">
           <Button
             size="sm"
             className="text-xs h-8 bg-primary hover:bg-primary/90 text-primary-foreground"
@@ -1193,9 +1193,9 @@ const IntakeOutputView = () => {
                 >
                   <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
                   className="h-7 w-7 text-primary hover:bg-muted/50"
                   onClick={() => setIsIntakeOutputEntryMode(!isIntakeOutputEntryMode)}
                 >
@@ -1566,13 +1566,16 @@ const ProblemsView = () => {
           </div>
         </div>
         <div className="flex-1 overflow-hidden min-h-0">
-          <div className="flex-1 overflow-auto">
-            <Table>
-              <TableHeader>
+          <div className="flex-1 overflow-auto max-h-80">
+            <Table className="text-xs min-h-0">
+              <TableHeader className="bg-accent text-foreground sticky top-0 z-10">
                 <TableRow>
-                  {tableHeaders.map((header, index) => (
-                    <TableHead key={index} className="text-xs font-medium text-foreground">
-                      {header}
+                  {tableHeaders.map((header) => (
+                    <TableHead key={header} className="py-2 px-3 font-semibold h-8 whitespace-nowrap text-foreground">
+                      <div className="flex items-center justify-between">
+                        {header}
+                        <ArrowUpDown className="h-3 w-3 ml-1 text-muted-foreground hover:text-foreground cursor-pointer" />
+                      </div>
                     </TableHead>
                   ))}
                 </TableRow>
@@ -1580,9 +1583,9 @@ const ProblemsView = () => {
               <TableBody>
                 {filteredProblems.length > 0 ? (
                   filteredProblems.map((problem: Problem, index: number) => (
-                    <TableRow key={problem.id}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell>
+                    <TableRow key={problem.id} className="even:bg-muted/30">
+                      <TableCell className="px-2 py-1 text-xs">{index + 1}</TableCell>
+                      <TableCell className="px-2 py-1 text-xs">
                         <Button 
                           variant="link" 
                           className="h-auto p-0 text-xs text-left"
@@ -1594,9 +1597,9 @@ const ProblemsView = () => {
                           {problem.problem.split(' (')[0]}
                         </Button>
                       </TableCell>
-                      <TableCell>{problem.immediacy || 'N/A'}</TableCell>
-                      <TableCell>{formatDate(problem.dateOfOnset)}</TableCell>
-                      <TableCell>
+                      <TableCell className="px-2 py-1 text-xs">{problem.immediacy || 'N/A'}</TableCell>
+                      <TableCell className="px-2 py-1 text-xs">{formatDate(problem.dateOfOnset)}</TableCell>
+                      <TableCell className="px-2 py-1 text-xs">
                         <span className={`px-2 py-1 text-xs rounded-full ${
                           problem.status === 'A' 
                             ? 'bg-green-100 text-green-800' 
@@ -1605,11 +1608,11 @@ const ProblemsView = () => {
                           {problem.status === 'A' ? 'Active' : 'Inactive'}
                         </span>
                       </TableCell>
-                      <TableCell className="space-x-1">
+                      <TableCell className="px-2 py-1 space-x-1 text-xs">
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-6 w-6"
+                          className="h-6 w-6 text-xs"
                           onClick={() => window.open(problem.editUrl, '_blank')}
                         >
                           <Edit3 className="h-3.5 w-3.5" />
@@ -1617,7 +1620,7 @@ const ProblemsView = () => {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-6 w-6 text-red-500 hover:text-red-600"
+                          className="h-6 w-6 text-xs text-red-500 hover:text-red-600"
                           onClick={() => window.open(problem.removeUrl, '_blank')}
                         >
                           <Ban className="h-3.5 w-3.5" />
@@ -1627,7 +1630,7 @@ const ProblemsView = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={tableHeaders.length} className="text-center py-4 text-muted-foreground">
+                    <TableCell colSpan={tableHeaders.length} className="text-center py-10 text-muted-foreground">
                       No problems found
                     </TableCell>
                   </TableRow>
@@ -1666,11 +1669,15 @@ const ProblemsView = () => {
             </div>
             <div className="space-y-4">
               <div className="flex items-center gap-4">
-                <Label className="text-xs w-24">Problem <span className="text-red-500">*</span></Label>
+                <Label className="text-xs w-24">
+                  Problem <span className="text-red-500">*</span>
+                </Label>
                 <Input className="h-8 text-xs flex-1" placeholder="Enter problem" />
               </div>
               <div className="flex items-center gap-4">
-                <Label className="text-xs w-24">Type <span className="text-red-500">*</span></Label>
+                <Label className="text-xs w-24">
+                  Type <span className="text-red-500">*</span>
+                </Label>
                 <Select>
                   <SelectTrigger className="h-8 text-xs flex-1">
                     <SelectValue placeholder="Select type" />
@@ -1682,8 +1689,10 @@ const ProblemsView = () => {
                 </Select>
               </div>
               <div className="flex items-center gap-4">
-                <Label className="text-xs w-24">Date <span className="text-red-500">*</span></Label>
-                <div className="relative flex-1">
+                <Label className="text-xs w-24">
+                  Date <span className="text-red-500">*</span>
+                </Label>
+                <div className="flex-1">
                   <Input className="h-8 text-xs pr-8" placeholder="MM/DD/YYYY" defaultValue="05/29/2025" />
                   <Button variant="ghost" size="icon" className="h-7 w-7 absolute right-0.5 top-0.5 text-muted-foreground">
                     <CalendarDays className="h-4 w-4" />
@@ -2007,7 +2016,7 @@ const ChiefComplaintsView = () => {
                       <TableCell>{complaint.CmpType}</TableCell>
                       <TableCell>{complaint.DateTime}</TableCell>
                       <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs ${
+                        <span className={`px-2 py-1 text-xs rounded-full ${
                           complaint.Status === 'ACTIVE' 
                             ? 'bg-green-100 text-green-800' 
                             : 'bg-gray-100 text-gray-800'

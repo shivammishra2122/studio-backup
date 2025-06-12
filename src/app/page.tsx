@@ -29,7 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-
+import usePatientProblems from '@/hooks/usePatientProblems';
 
 // Chart configurations
 const glucoseChartConfig: ChartConfig = { level: { label: 'Glucose (mg/dL)', color: 'hsl(var(--chart-2))' } };
@@ -67,7 +67,6 @@ interface Allergy {
   createdBy: string;
   createdAt: string;
 }
-
 
 // Define Dialog types
 type DialogType = 'problem' | 'medication' | 'info-item' | 'allergies' | 'radiology' | 'report';
@@ -107,6 +106,11 @@ export default function DashboardPage({
   allergies: Allergy[];
   vitals: any; // Replace with your vitals type if available
 }): JSX.Element {
+  // Fetch up-to-date problems for the patient (fallback to provided problems until fetch completes)
+  const effectiveSSN = patient.ssn && patient.ssn.trim() !== '' ? patient.ssn : '670230065';
+  const { problems: fetchedProblems } = usePatientProblems(effectiveSSN);
+  const problemsToShow = fetchedProblems.length ? fetchedProblems : problems;
+
   // State management
   const [dynamicPageCardContent, setDynamicPageCardContent] = useState<Record<string, string[]>>(() => {
     const parsedContent = JSON.parse(JSON.stringify(pageCardSampleContent)) as Record<string, string[]>;
@@ -503,7 +507,7 @@ export default function DashboardPage({
             <div className="flex items-center space-x-1.5">
               <Clock className="h-4 w-4 text-primary" />
               <CardTitle className="text-base">Problems</CardTitle>
-              <Badge variant="secondary" className="text-xs px-1.5 py-0.5">{problems.length}</Badge>
+              <Badge variant="secondary" className="text-xs px-1.5 py-0.5">{problemsToShow.length}</Badge>
             </div>
             <Button
               variant="ghost"
@@ -518,7 +522,7 @@ export default function DashboardPage({
           <CardContent className="p-0 max-h-32 overflow-y-auto no-scrollbar">
             <Table>
               <TableBody>
-                {problems.map((problem, index) => (
+                {problemsToShow.map((problem, index) => (
                   <TableRow key={problem.id} className={index % 2 === 0 ? 'bg-muted/30' : ''}>
                     <TableCell className="px-2 py-1">
                       <div
@@ -527,13 +531,13 @@ export default function DashboardPage({
                           setSelectedProblem(problem);
                           setShowProblemDialog(true);
                         }}
-                      >{problem.description}</div>
+                      >{('description' in problem ? (problem as any).description : (problem as any).problem)}</div>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-            {problems.length === 0 && (
+            {problemsToShow.length === 0 && (
               <p className="py-4 text-center text-xs text-muted-foreground">No problems listed.</p>
             )}
           </CardContent>
@@ -1366,7 +1370,7 @@ export default function DashboardPage({
             )}
             {dialog.type === 'radiology' && (
               <div className="flex flex-col gap-4 text-sm">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4 text-sm">
+                <div className="grid grid-cols-2 gap-4">
                   <div><span className="font-semibold">Patient ID:</span> 800000035</div>
                   <div><span className="font-semibold">Name:</span> Anonymous Two</div>
                   <div><span className="font-semibold">Age:</span> 69 Years</div>
@@ -1752,6 +1756,3 @@ export default function DashboardPage({
     </div>
   );
 }
-
-
-

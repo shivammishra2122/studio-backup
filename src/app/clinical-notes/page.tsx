@@ -146,7 +146,8 @@ const ClinicalNotesPage = ({ patient }: ClinicalNotesPageProps) => {
       }
 
       // Refresh the notes list after successful deletion
-      fetchClinicalNotes();
+      const ssn = patient?.ssn || DEFAULT_SSN;
+      fetchClinicalNotes({ ssn });
       alert('Note deleted successfully');
     } catch (error) {
       console.error('Error deleting note:', error);
@@ -156,7 +157,7 @@ const ClinicalNotesPage = ({ patient }: ClinicalNotesPageProps) => {
     }
   };
 
-  const handleSaveSignature = async (signatureData: string) => {
+  const handleSaveSignature = async (signatureData: string): Promise<void> => {
     if (!currentNoteId) return;
     
     try {
@@ -168,7 +169,7 @@ const ClinicalNotesPage = ({ patient }: ClinicalNotesPageProps) => {
         },
         body: JSON.stringify({ 
           noteId: currentNoteId,
-          signatureData // You can send the signature data to the server if needed
+          signatureData
         }),
       });
 
@@ -185,7 +186,7 @@ const ClinicalNotesPage = ({ patient }: ClinicalNotesPageProps) => {
         )
       );
       
-      return true; // Indicate success
+      // No return value needed as we're returning void
     } catch (error) {
       console.error('Error signing note:', error);
       throw error; // Re-throw to be handled by the dialog
