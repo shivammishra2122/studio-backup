@@ -30,6 +30,8 @@ import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import usePatientProblems from '@/hooks/usePatientProblems';
+import { usePatientAllergies } from '@/hooks/usePatientAllergies';
+import { useClinicalNotes, type ClinicalNote } from '@/hooks/useClinicalNotes';
 
 // Chart configurations
 const glucoseChartConfig: ChartConfig = { level: { label: 'Glucose (mg/dL)', color: 'hsl(var(--chart-2))' } };
@@ -109,14 +111,26 @@ export default function DashboardPage({
   // Fetch up-to-date problems for the patient (fallback to provided problems until fetch completes)
   const effectiveSSN = patient.ssn && patient.ssn.trim() !== '' ? patient.ssn : '670230065';
   const { problems: fetchedProblems } = usePatientProblems(effectiveSSN);
+  const { allergies: fetchedAllergies, loading: allergiesLoading } = usePatientAllergies(effectiveSSN);
+  const { notes: clinicalNotes, loading: clinicalNotesLoading } = useClinicalNotes(effectiveSSN);
+  
   const problemsToShow = fetchedProblems.length ? fetchedProblems : problems;
+  const allergiesToShow = Object.values(fetchedAllergies).length > 0 ? Object.values(fetchedAllergies) : allergies;
 
   // State management
   const [dynamicPageCardContent, setDynamicPageCardContent] = useState<Record<string, string[]>>(() => {
     const parsedContent = JSON.parse(JSON.stringify(pageCardSampleContent)) as Record<string, string[]>;
-    return Object.fromEntries(Object.entries(parsedContent).filter(([key]) => key !== 'Allergies'));
+    // Remove Allergies and Clinical Notes from dynamic content as they use their own data
+    return Object.fromEntries(
+      Object.entries(parsedContent)
+        .filter(([key]) => key !== 'Allergies' && key !== 'Clinical Notes')
+    );
   });
   const [floatingDialogs, setFloatingDialogs] = useState<FloatingDialog[]>([]);
+  const [localMedications, setLocalMedications] = useState<Medication[]>(medications || []);
+  const [selectedRows, setSelectedRows] = useState<MedicationRow[]>([]);
+  const [showProblemDialog, setShowProblemDialog] = useState(false);
+  const [selectedProblem, setSelectedProblem] = useState<Problem | null>(null);
   const [activeChartTab, setActiveChartTab] = useState<string>('heart-rate');
   const [detailViewTitle, setDetailViewTitle] = useState<string>('');
   const [detailViewContent, setDetailViewContent] = useState<string>('');
@@ -124,10 +138,6 @@ export default function DashboardPage({
   const [quickOrder, setQuickOrder] = useState<string>('');
   const [dropdownOpen, setDropdownOpen] = useState<boolean>(false);
   const [filteredMeds, setFilteredMeds] = useState<string[]>([]);
-  const [localMedications, setLocalMedications] = useState<Medication[]>(medications || []);
-  const [selectedRows, setSelectedRows] = useState<MedicationRow[]>([]);
-  const [showProblemDialog, setShowProblemDialog] = useState(false);
-  const [selectedProblem, setSelectedProblem] = useState<Problem | null>(null);
   const [showAllergyDialog, setShowAllergyDialog] = useState(false);
   const [selectedAllergy, setSelectedAllergy] = useState<Allergy | null>(null);
 
@@ -162,6 +172,12 @@ export default function DashboardPage({
   const SCHEDULES = ['Daily', 'BID', 'TID', 'QID'];
   const PRIORITIES = ['Routine', 'Urgent', 'STAT'];
   const MEDICATIONS = ['Aspirin', 'Metformin', 'Ibuprofen', 'Lisinopril'];
+
+  // Debug medications data
+  useEffect(() => {
+    console.log('Initial medications prop:', medications);
+    console.log('Initial localMedications state:', localMedications);
+  }, [medications, localMedications]);
 
   // Auto-save functionality for dialog inputs
   useEffect(() => {
@@ -528,7 +544,7 @@ export default function DashboardPage({
                       <div
                         className="font-medium text-xs cursor-pointer"
                         onClick={() => {
-                          setSelectedProblem(problem);
+                          setSelectedProblem();
                           setShowProblemDialog(true);
                         }}
                       >{('description' in problem ? (problem as any).description : (problem as any).problem)}</div>
@@ -780,7 +796,7 @@ export default function DashboardPage({
       <div className="grid grid-cols-1 md:grid-cols-10 gap-3 mb-2">
         {secondRowInformationalCardTitles.map((title) => {
           const IconComponent = infoCardIcons[title] || FileText;
-          const items = title === 'Allergies' ? allergies : dynamicPageCardContent[title] || [];
+          const items = title === 'Allergies' ? allergiesToShow : dynamicPageCardContent[title] || [];
           return (
             <Card
               key={title.toLowerCase().replace(/\s+/g, '-')}
@@ -796,7 +812,7 @@ export default function DashboardPage({
                     {title === 'Medications History' ? 'Medications' : title}
                   </CardTitle>
                   <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
-                    {title === 'Allergies' ? allergies.length : title === 'Medications History' ? medications.length : (items as string[]).length}
+                    {title === 'Allergies' ? allergiesToShow.length : title === 'Medications History' ? medications.length + localMedications.length : (items as string[]).length}
                   </Badge>
                 </div>
                 <Button
@@ -825,37 +841,82 @@ export default function DashboardPage({
                 <Table>
                   <TableBody>
                     {title === 'Allergies' ? (
-                      (items as Allergy[]).map((allergy: Allergy, index) => (
-                        <TableRow
-                          key={allergy.id}
-
-                          className={`cursor-pointer hover:bg-muted/50 ${index % 2 === 0 ? 'bg-muted/30' : ''}`} // Keep existing styling
-                          onClick={() => {
-                            setSelectedAllergy(allergy);
-                            setShowAllergyDialog(true);
-                          }}
-                        >
-                          <TableCell className="px-2 py-1">
-                            <div className="font-medium text-xs">{`${allergy.allergen} - ${allergy.reaction} (${allergy.severity})`}</div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : title === 'Medications History' ? (
-                      medications.map((med, index) => (
-                        <TableRow key={med.id} className={index % 2 === 0 ? 'bg-muted/30' : ''}>
-                          <TableCell className="px-2 py-1">
-                            <div className="font-medium text-xs">{med.name}</div>
-                          </TableCell>
-                          <TableCell className="px-2 py-1 text-right">
-                            <div className="text-xs">
-                              <span className={`font-medium ${med.status === 'Active' ? 'text-green-600' : 'text-red-600'}`}>
-
-                                {med.status}
-                              </span>
+                      allergiesToShow.length > 0 ? (
+                        <Table>
+                          <TableBody>
+                            {allergiesToShow.map((allergy: any, index: number) => (
+                              <TableRow
+                                key={allergy['Order IEN'] || index}
+                                className={`cursor-pointer hover:bg-muted/50 ${index % 2 === 0 ? 'bg-muted/30' : ''}`}
+                                onClick={() => {
+                                  setSelectedAllergy(allergy);
+                                  setShowAllergyDialog(true);
+                                }}
+                              >
+                                <TableCell className="px-2 py-1">
+                                  <div className="flex items-center">
+                                    <span className="text-xs">
+                                      {allergy.Allergies || 'Unknown Allergen'}
+                                      {allergy.Symptoms && ` - ${allergy.Symptoms}`}
+                                    </span>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={1} className="px-2 py-2">
+                            <div className="text-xs text-muted-foreground">
+                              {allergiesLoading ? 'Loading allergies...' : 'No allergies listed.'}
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))
+                      )
+                    ) : title === 'Medications History' ? (
+                      (() => {
+                        console.log('Rendering Medications History card...');
+                        console.log('medications:', JSON.stringify(medications, null, 2));
+                        console.log('localMedications:', JSON.stringify(localMedications, null, 2));
+                        
+                        const medsToShow = [
+                          ...(Array.isArray(medications) ? medications : []),
+                          ...(Array.isArray(localMedications) ? localMedications : [])
+                        ];
+                        
+                        console.log('Combined medications to show:', medsToShow);
+                        
+                        if (medsToShow.length === 0) {
+                          console.warn('No medications found in either medications or localMedications');
+                        }
+                        
+                        return medsToShow.length > 0 ? (
+                          <div className="space-y-1">
+                            {medsToShow.slice(0, 3).map((med: any, index: number) => {
+                              console.log(`Rendering medication ${index}:`, med);
+                              return (
+                                <div key={`${med.id || med.medicationId || index}`} className="flex items-center justify-between py-1 px-2 hover:bg-muted/30 rounded">
+                                  <span className="text-xs truncate">
+                                    {med.name || med.medication || med.medicationName || 'Unnamed Medication'}
+                                  </span>
+                                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                    (String(med.status || '').toLowerCase() === 'active') 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : 'bg-yellow-100 text-yellow-800'
+                                  }`}>
+                                    {med.status || 'Unknown'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground py-2 px-2">
+                            No medications found. Check console for details.
+                          </p>
+                        );
+                      })()
                     ) : (
                       (items as string[]).map((item, index) => (
                         <TableRow
@@ -871,7 +932,7 @@ export default function DashboardPage({
                     )}
                   </TableBody>
                 </Table>
-                {(title === 'Allergies' ? allergies.length : title === 'Medications History' ? medications.length : (items as string[]).length) === 0 && (
+                {(title === 'Allergies' ? allergiesToShow.length : title === 'Medications History' ? medications.length + localMedications.length : (items as string[]).length) === 0 && (
                   <p className="py-4 text-center text-xs text-muted-foreground">No items listed.</p>
                 )}
               </CardContent>
@@ -885,6 +946,75 @@ export default function DashboardPage({
         {thirdRowInformationalCardTitles.map((title) => {
           const IconComponent = infoCardIcons[title] || FileText;
           const items = dynamicPageCardContent[title] || [];
+          
+          // Special handling for Clinical Notes card
+          if (title === 'Clinical Notes') {
+            return (
+              <Card key="clinical-notes" className="shadow-lg">
+                <ShadcnCardHeader className="flex flex-row items-center justify-between pt-2 pb-0 px-3">
+                  <div className="flex items-center space-x-1.5">
+                    <IconComponent className="h-4 w-4 text-primary" />
+                    <CardTitle className="text-base">{title}</CardTitle>
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                      {clinicalNotesLoading ? '...' : clinicalNotes.length}
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => {
+                      // Navigate to clinical notes page or open a dialog
+                      window.location.href = '/clinical-notes';
+                    }}
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                    <span className="sr-only">View {title}</span>
+                  </Button>
+                </ShadcnCardHeader>
+                <CardContent className="p-0 max-h-32 overflow-y-auto no-scrollbar">
+                  <Table>
+                    <TableBody>
+                      {clinicalNotesLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={1} className="px-2 py-2">
+                            <div className="text-xs text-muted-foreground">Loading clinical notes...</div>
+                          </TableCell>
+                        </TableRow>
+                      ) : clinicalNotes.length > 0 ? (
+                        clinicalNotes.slice(0, 5).map((note: ClinicalNote, index: number) => (
+                          <TableRow
+                            key={note.id}
+                            className={`cursor-pointer hover:bg-muted/50 ${index % 2 === 0 ? 'bg-muted/30' : ''}`}
+                            onClick={() => {
+                              // Navigate to the specific note or open a dialog
+                              window.location.href = `/clinical-notes#${note.id}`;
+                            }}
+                          >
+                            <TableCell className="px-2 py-1">
+                              <div className="flex items-center">
+                                <span className="text-xs truncate">
+                                  {note.notesTitle}
+                                </span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={1} className="px-2 py-2">
+                            <div className="text-xs text-muted-foreground">No clinical notes found</div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            );
+          }
+
+          // Default card rendering for other cards
           return (
             <Card key={title.toLowerCase().replace(/\s+/g, '-')} className="shadow-lg">
               <ShadcnCardHeader className="flex flex-row items-center justify-between pt-2 pb-0 px-3">
@@ -1459,8 +1589,12 @@ export default function DashboardPage({
             {dialog.type === 'report' && (
               <div className="flex flex-col gap-4 text-sm">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Report Search</Label>
+                  <div><span className="font-semibold">Report Search</span></div>
+                  <div><span className="font-semibold">Quick Orders</span></div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <Label>Search</Label>
                     <Input
                       value={reportInputs[dialog.id]?.search || ''}
                       onChange={(e) =>
@@ -1469,6 +1603,7 @@ export default function DashboardPage({
                           [dialog.id]: { ...prev[dialog.id], search: e.target.value },
                         }))
                       }
+                      className="flex-1"
                     />
                     <div className="mt-2 border p-2 h-32 overflow-y-auto text-sm">
                       {['LIVER FUNCTION TEST', 'DSDNA AB', 'THYROID PANEL']
@@ -1497,8 +1632,8 @@ export default function DashboardPage({
                         ))}
                     </div>
                   </div>
-                  <div>
-                    <Label>Quick Orders</Label>
+                  <div className="flex flex-col gap-2">
+                    <Label>Quick Search</Label>
                     <Input
                       value={reportInputs[dialog.id]?.quickSearch || ''}
                       onChange={(e) =>
@@ -1507,6 +1642,7 @@ export default function DashboardPage({
                           [dialog.id]: { ...prev[dialog.id], quickSearch: e.target.value },
                         }))
                       }
+                      className="flex-1"
                     />
                     <div className="mt-2 border p-2 h-32 overflow-y-auto text-sm">
                       {['BLOOD SUGAR', 'CBC', 'ESR']

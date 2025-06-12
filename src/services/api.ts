@@ -105,38 +105,98 @@ export async function fetchClinicalNotes({
     ewd_sessid?: string;
     DUZ?: string;
 }) {
+    // Ensure dates are in YYYY-MM-DD format
+    const formatDate = (dateStr: string): string => {
+        if (!dateStr) return '';
+        try {
+            // Try to parse the date string and reformat it
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return '';
+            
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        } catch (e) {
+            console.error('Error formatting date:', e);
+            return '';
+        }
+    };
+
+    const formattedFromDate = formatDate(fromDate);
+    const formattedToDate = formatDate(toDate || new Date().toISOString().split('T')[0]);
+
     const body: any = {
         UserName: 'CPRS-UAT',
         Password: 'UAT@123',
         PatientSSN: patientSSN,
-        FromDate: fromDate,
-        ToDate: toDate,
+        FromDate: formattedFromDate,
+        ToDate: formattedToDate,
         DUZ,
         ihtLocation,
         ewd_sessid,
     };
 
-    if (status !== undefined) {
+    if (status) {
         body.status = status;
     }
 
+    console.log('Sending request to clinical notes API:', {
+        url: `${API_BASE_URL}/apiCLNoteList.sh`,
+        body: JSON.stringify(body, null, 2)
+    });
+
     try {
         const response = await axios.post(`${API_BASE_URL}/apiCLNoteList.sh`, body, {
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            timeout: 10000, // 10 second timeout
         });
 
-        console.log('Clinical Notes API Response:', response.data);
+        console.log('Clinical notes API response status:', response.status);
+        
+        if (!response.data) {
+            console.error('Empty response from clinical notes API');
+            return [];
+        }
 
-        if (response.data && typeof response.data === 'object') {
-            if (response.data.errors) {
-                console.error('API Error:', response.data.errors);
-                return [];
-            }
+
+        if (response.data.errors) {
+            console.error('API Error:', response.data.errors);
+            return [];
+        }
+
+
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+
+
+        if (typeof response.data === 'object') {
             return Object.values(response.data);
         }
+
+        console.warn('Unexpected response format from API:', response.data);
         return [];
     } catch (error) {
-        console.error('Error fetching clinical notes:', error);
+        if (axios.isAxiosError(error)) {
+            console.error('Axios error fetching clinical notes:', {
+                message: error.message,
+                status: error.response?.status,
+                statusText: error.response?.statusText,
+                responseData: error.response?.data,
+                request: {
+                    url: error.config?.url,
+                    method: error.config?.method,
+                    data: error.config?.data,
+                    headers: error.config?.headers,
+                },
+            });
+        } else {
+            console.error('Error in fetchClinicalNotes:', error);
+        }
         return [];
     }
 } 
