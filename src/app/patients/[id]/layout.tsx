@@ -118,14 +118,14 @@ export default function PatientLayout({
     }
 
     return (
-        <div className="flex h-screen">
+        <div className="flex flex-col min-h-screen">
             {/* <SidebarNav /> */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-h-0">
                 {/* <TopNav /> */}
-                <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex-1 flex flex-col min-h-0">
                     {/* PatientNav removed */}
                     <PatientProvider patient={patient}>
-                        <main className="flex-1 overflow-auto p-3">
+                        <main className="flex-1 overflow-auto px-2 md:px-4 pt-2">
                             {children}
                         </main>
                     </PatientProvider>

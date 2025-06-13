@@ -3,7 +3,8 @@
 import type { NextPage } from 'next';
 import React, { useState, useEffect, useCallback } from 'react';
 
-type VitalData = {
+type vitalSign
+ = {
   id: string;
   date: string;
   bloodPressure: string | null;
@@ -22,6 +23,25 @@ type VitalData = {
   [key: string]: any; // Allow string indexing
 };
 
+interface VitalApiResponse {
+  [key: string]: {
+    VitalDateTime: string;
+    VitalFlag: number;
+    VitalName: string;
+    VitalType: number;
+    VitalValue: string | number;
+  };
+}
+
+interface VitalData {
+  id: string;
+  date: string;
+  name: string;
+  type: number;
+  value: string | number;
+  flag: number;
+}
+
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -29,6 +49,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { Slider } from "@/components/ui/slider";
 
 // Custom TableRow without hover effect for vitals entry
 const VitalsTableRow = React.forwardRef<
@@ -77,53 +98,6 @@ const vitalTypes = [
 ];
 
 type VitalChartDataPoint = { name: string; value?: number; systolic?: number; diastolic?: number };
-
-const generateRandomValue = (min: number, max: number, toFixed: number = 0): number => {
-  if (typeof window === 'undefined') return parseFloat(min.toFixed(toFixed));
-  const val = Math.random() * (max - min) + min;
-  return parseFloat(val.toFixed(toFixed));
-};
-
-const getMockDataForVital = (vitalName: string): VitalChartDataPoint[] => {
-  if (typeof window === 'undefined') {
-    const defaultData = Array.from({ length: 10 }, (_, i) => ({ name: (i + 1).toString() }));
-    if (vitalName === "B/P (mmHg)") {
-      return defaultData.map(d => ({ ...d, systolic: 0, diastolic: 0 }));
-    }
-    return defaultData.map(d => ({ ...d, value: 0 }));
-  }
-
-  switch (vitalName) {
-    case "B/P (mmHg)":
-      return Array.from({ length: 10 }, (_, i) => ({
-        name: (i + 1).toString(),
-        systolic: generateRandomValue(110, 140),
-        diastolic: generateRandomValue(70, 90)
-      }));
-    case "Temp (F)":
-      return Array.from({ length: 10 }, (_, i) => ({ name: (i + 1).toString(), value: generateRandomValue(97.0, 102.0, 1) }));
-    case "Resp (/min)":
-      return Array.from({ length: 10 }, (_, i) => ({ name: (i + 1).toString(), value: generateRandomValue(12, 22) }));
-    case "Pulse (/min)":
-      return Array.from({ length: 10 }, (_, i) => ({ name: (i + 1).toString(), value: generateRandomValue(60, 100) }));
-    case "Height (In)":
-      return Array.from({ length: 10 }, (_, i) => ({ name: (i + 1).toString(), value: generateRandomValue(60, 75, 1) }));
-    case "Weight (kg)":
-      return Array.from({ length: 10 }, (_, i) => ({ name: (i + 1).toString(), value: generateRandomValue(50, 100, 1) }));
-    case "CVP (cmH2O)":
-      return Array.from({ length: 10 }, (_, i) => ({ name: (i + 1).toString(), value: generateRandomValue(2, 8, 1) }));
-    case "C/G (In)":
-      return Array.from({ length: 10 }, (_, i) => ({ name: (i + 1).toString(), value: generateRandomValue(20, 40, 1) }));
-    case "Pulse Oximetry (%)":
-      return Array.from({ length: 10 }, (_, i) => ({ name: (i + 1).toString(), value: generateRandomValue(94, 99) }));
-    case "Pain":
-      return Array.from({ length: 10 }, (_, i) => ({ name: (i + 1).toString(), value: generateRandomValue(0, 10) }));
-    case "Early Warning Sign":
-      return Array.from({ length: 10 }, (_, i) => ({ name: (i + 1).toString(), value: generateRandomValue(0, 5) }));
-    default:
-      return Array.from({ length: 10 }, (_, i) => ({ name: (i + 1).toString(), value: 0 }));
-  }
-};
 
 const getYAxisConfig = (vitalName: string): { label: string; domain: [number | string, number | string] } => {
   switch (vitalName) {
@@ -178,10 +152,11 @@ const VitalsView = () => {
     pulseOximetryValue: '',
     pulseOximetryQualifier: undefined as string | undefined,
   });
-  const [vitalsData, setVitalsData] = useState<any[]>([]);
+  const [vitalsData, setVitalsData] = useState<VitalData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showEntries, setShowEntries] = useState<string>("10");
+  const [dateRange, setDateRange] = useState<number[]>([0, 7]); // Default: last 7 days
 
   const yAxisConfig = getYAxisConfig(selectedVitalForGraph);
 
@@ -264,87 +239,109 @@ const VitalsView = () => {
   const fetchVitalsData = useCallback(async () => {
     setLoading(true);
     setError(null);
-
-    // Patient data comes from the wrapper component
-    // We need to access the patient prop passed to VitalsDashboardPage
-    // However, VitalsView doesn't directly receive it.
-    // We need to modify VitalsDashboardPage to pass the patient prop to VitalsView.
-    // For now, we will use a placeholder SSN for testing.
-    const testSSN = "671106286"; // Use the provided test SSN
-
-    const requestBody = {
-      UserName: "CPRS-UAT",
-      Password: "UAT@123",
-      PatientSSN: testSSN,
-      DUZ: "115"
-    };
-
+    
     try {
       const response = await fetch('http://3.6.230.54:4003/api/apiVitalView.sh', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          UserName: 'CPRS-UAT',
+          Password: 'UAT@123',
+          PatientSSN: '671106286',
+          DUZ: '115'
+        })
       });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data: VitalApiResponse = await response.json();
+      console.log('API Response:', data);
       
-      if (data) {
-        // Process the vitals data
-        const vitalsArray = Object.entries(data).map(([key, item]: [string, any]) => ({
-          id: key,
-          date: item['Date'] || new Date().toISOString(),
-          bloodPressure: item['Blood Pressure'] || null,
-          temperature: item['Temperature'] || null,
-          pulse: item['Pulse'] || null,
-          respiration: item['Respiration'] || null,
-          height: item['Height'] || null,
-          weight: item['Weight'] || null,
-          cvp: item['CVP'] || null,
-          cg: item['C/G'] || null,
-          pulseOximetry: item['Pulse Oximetry'] || null,
-          pain: item['Pain'] || null,
-          earlyWarningSign: item['Early Warning Sign'] || null,
-          location: item['Location'] || 'N/A',
-          enteredBy: item['Entered By'] || 'N/A',
-        }));
-        
-        setVitalsData(vitalsArray);
-        
-        // Generate chart data from the actual vitals data
-        if (vitalsArray.length > 0) {
-          const chartData = vitalsArray.map((vital: VitalData, index) => {
-            const vitalKey = selectedVitalForGraph.toLowerCase();
-            const value = vital[vitalKey as keyof VitalData];
-            return {
-              name: `Record ${index + 1}`,
-              value: value !== null && value !== undefined ? value : 0,
-              date: vital.date
-            };
-          });
-          setChartData(chartData);
-        } else {
-          // Fallback to mock data if no vitals data
-          setChartData(getMockDataForVital(selectedVitalForGraph));
-        }
+      // Transform API response to our VitalData array
+      const transformedData: VitalData[] = Object.entries(data).map(([key, value]) => ({
+        id: key,
+        date: value.VitalDateTime || new Date().toISOString(),
+        name: value.VitalName,
+        type: value.VitalType,
+        value: value.VitalValue,
+        flag: value.VitalFlag
+      }));
+
+      console.log('Transformed Vitals Data:', transformedData);
+      setVitalsData(transformedData);
+      
+      // Set default selected vital if not already set
+      if (transformedData.length > 0 && !selectedVitalForGraph) {
+        setSelectedVitalForGraph(transformedData[0].name);
       }
-    } catch (err: any) {
-      console.error('Error fetching vitals data:', err);
-      setError('Failed to fetch vitals data: ' + err.message);
+    } catch (err) {
+      console.error('Error fetching vitals:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch vitals');
     } finally {
       setLoading(false);
     }
   }, [selectedVitalForGraph]);
 
+  const handleVitalRowClick = (vitalName: string) => {
+    console.log('Vital selected:', vitalName);
+    setSelectedVitalForGraph(vitalName);
+    
+    if (vitalsData.length === 0) {
+      setChartData([]);
+      return;
+    }
+    
+    // Filter and map data for the selected vital
+    const selectedVitalData = vitalsData
+      .filter(vital => vital.name === vitalName && vital.value !== undefined)
+      .map((vital, index) => {
+        let numericValue: number | null = null;
+        
+        // Extract numeric value from the VitalValue string
+        if (typeof vital.value === 'string') {
+          const match = String(vital.value).match(/(\d+\.?\d*)/);
+          if (match) {
+            numericValue = parseFloat(match[0]);
+          }
+        } else if (typeof vital.value === 'number') {
+          numericValue = vital.value;
+        }
+        
+        return {
+          name: `Record ${index + 1}`,
+          value: numericValue !== null && !isNaN(numericValue) ? numericValue : 0,
+          date: vital.date,
+          rawValue: vital.value
+        };
+      });
+    
+    console.log('Chart data for', vitalName, ':', selectedVitalData);
+    setChartData(selectedVitalData);
+  };
+
   useEffect(() => {
     fetchVitalsData();
   }, [fetchVitalsData]);
+
+  const handleDateRangeChange = (value: number[]) => {
+    setDateRange(value);
+    setVisitDateState('custom'); // Set to custom when slider is used
+  };
+
+  const formatDate = (daysAgo: number) => {
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+    return date.toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).toUpperCase();
+  };
 
   return (
     <div className="flex-1 flex gap-3 overflow-auto">
@@ -434,7 +431,7 @@ const VitalsView = () => {
                     <TableCell className="py-1.5 px-3"></TableCell>
                     <TableCell className="py-1.5 px-3"></TableCell>
                   </VitalsTableRow>
-                  <VitalsTableRow className="hover:bg-transparent">
+                  <TableRow>
                     <TableCell className="py-1.5 px-3">Pulse</TableCell>
                     <TableCell className="py-1.5 px-3"></TableCell>
                     <TableCell className="py-1.5 px-3">
@@ -450,8 +447,8 @@ const VitalsView = () => {
                         </SelectContent>
                       </Select>
                     </TableCell>
-                  </VitalsTableRow>
-                  <VitalsTableRow className="bg-muted/30">
+                  </TableRow>
+                  <TableRow className="bg-muted/30">
                     <TableCell className="py-1.5 px-3">Height</TableCell>
                     <TableCell className="py-1.5 px-3"></TableCell>
                     <TableCell className="py-1.5 px-3">
@@ -475,7 +472,7 @@ const VitalsView = () => {
                         </SelectContent>
                       </Select>
                     </TableCell>
-                  </VitalsTableRow>
+                  </TableRow>
                   <TableRow>
                     <TableCell className="py-1.5 px-3">Weight</TableCell>
                     <TableCell className="py-1.5 px-3"></TableCell>
@@ -593,63 +590,59 @@ const VitalsView = () => {
           </>
         ) : (
           <>
-            <div className="flex-1 flex flex-col overflow-hidden p-3 pt-0">
+            <div className="flex-1 flex flex-col overflow-hidden p-0">
               <div className="mb-2 text-xs">
-                <div className="flex flex-wrap items-center justify-between w-full gap-3">
+                <div className="flex flex-nowrap items-center justify-between w-full gap-3">
                   <div className="flex items-center gap-3">
-                    <Label htmlFor="visitDate" className="text-xs whitespace-nowrap">Visit Date</Label>
-                    <Select value={visitDateState} onValueChange={setVisitDateState}>
-                      <SelectTrigger id="visitDate" className="h-7 w-40 text-xs">
-                        <SelectValue placeholder="Select Date" />
+                    <Select value={visitDateState} onValueChange={(value) => {
+                      setVisitDateState(value);
+                      // Set default date ranges based on selection
+                      if (value === 'today') setDateRange([0, 0]);
+                      if (value === 'yesterday') setDateRange([1, 1]);
+                      if (value === 'week') setDateRange([0, 7]);
+                      if (value === 'month') setDateRange([0, 30]);
+                    }}>
+                      <SelectTrigger className="h-7 w-28 text-xs">
+                        <SelectValue placeholder="Last 7 days" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="today">Today</SelectItem>
-                        <SelectItem value="last24">Last 24 Hours</SelectItem>
-                        <SelectItem value="last48">Last 48 Hours</SelectItem>
-                        <SelectItem value="range">Date Range</SelectItem>
+                        <SelectItem value="today" className="text-xs">Today</SelectItem>
+                        <SelectItem value="yesterday" className="text-xs">Yesterday</SelectItem>
+                        <SelectItem value="week" className="text-xs">This Week</SelectItem>
+                        <SelectItem value="month" className="text-xs">This Month</SelectItem>
+                        <SelectItem value="custom" className="text-xs">Custom Range</SelectItem>
                       </SelectContent>
                     </Select>
-                    {visitDateState === "range" && (
-                      <>
-                        <Label htmlFor="fromDate" className="text-xs whitespace-nowrap">From</Label>
-                        <div className="relative">
-                          <Input
-                            id="fromDate"
-                            type="text"
-                            className="h-7 w-28 text-xs pr-6"
-                            value={fromDateValue}
-                            onChange={(e) => setFromDateValue(e.target.value)}
-                            aria-label="From Date"
-                            placeholder="DD/MM/YYYY"
-                          />
-                          <CalendarDays className="h-3.5 w-3.5 absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        </div>
-                        <Label htmlFor="toDate" className="text-xs whitespace-nowrap">To</Label>
-                        <div className="relative">
-                          <Input
-                            id="toDate"
-                            type="text"
-                            className="h-7 w-28 text-xs pr-6"
-                            value={toDateValueState}
-                            onChange={(e) => setToDateValueState(e.target.value)}
-                            aria-label="To Date"
-                            placeholder="DD/MM/YYYY"
-                          />
-                          <CalendarDays className="h-3.5 w-3.5 absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        </div>
-                      </>
-                    )}
+                    
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap w-20 text-right">
+                        {formatDate(dateRange[1])}
+                      </span>
+                      <Slider
+                        value={dateRange}
+                        onValueChange={handleDateRangeChange}
+                        min={0}
+                        max={30}
+                        step={1}
+                        minStepsBetweenThumbs={1}
+                        className="w-32"
+                      />
+                      <span className="text-xs text-muted-foreground whitespace-nowrap w-20">
+                        {formatDate(dateRange[0])}
+                      </span>
+                    </div>
                   </div>
+                  
                   <div className="flex items-center gap-2">
                     <Label htmlFor="showEntries" className="text-xs whitespace-nowrap">Show</Label>
                     <Select value={showEntries} onValueChange={setShowEntries}>
-                      <SelectTrigger id="showEntries" className="h-7 w-16 text-xs">
-                        <SelectValue />
+                      <SelectTrigger className="h-7 w-16 text-xs">
+                        <SelectValue placeholder="10" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="10">10</SelectItem>
-                        <SelectItem value="25">25</SelectItem>
-                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="10" className="text-xs">10</SelectItem>
+                        <SelectItem value="25" className="text-xs">25</SelectItem>
+                        <SelectItem value="50" className="text-xs">50</SelectItem>
                       </SelectContent>
                     </Select>
                     <Label htmlFor="showEntries" className="text-xs whitespace-nowrap">entries</Label>
@@ -684,56 +677,41 @@ const VitalsView = () => {
                           <p className="text-destructive">{error}</p>
                         </TableCell>
                       </TableRow>
+                    ) : vitalsData.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center py-4">
+                          <p className="text-muted-foreground">No vitals data available</p>
+                        </TableCell>
+                      </TableRow>
                     ) : (
-                      vitalTypes.map((vitalType, index) => {
-                        // Find the most recent entry for this vital type
-                        const latestVital = vitalsData.length > 0 
-                          ? vitalsData[0] // Assuming the data is sorted with most recent first
-                          : null;
-                        
-                        // Map vital type to the corresponding data field
-                        const getVitalValue = () => {
-                          if (!latestVital) return '-';
-                          
-                          switch(vitalType) {
-                            case 'B/P (mmHg)':
-                              return latestVital.bloodPressure || '-';
-                            case 'Temp (F)':
-                              return latestVital.temperature || '-';
-                            case 'Resp (/min)':
-                              return latestVital.respiration || '-';
-                            case 'Pulse (/min)':
-                              return latestVital.pulse || '-';
-                            case 'Height (In)':
-                              return latestVital.height || '-';
-                            case 'Weight (kg)':
-                              return latestVital.weight || '-';
-                            case 'CVP (cmH2O)':
-                              return latestVital.cvp || '-';
-                            case 'C/G (In)':
-                              return latestVital.cg || '-';
-                            case 'Pulse Oximetry (%)':
-                              return latestVital.pulseOximetry || '-';
-                            case 'Pain':
-                              return latestVital.pain || '-';
-                            case 'Early Warning Sign':
-                              return latestVital.earlyWarningSign || '-';
-                            default:
-                              return '-';
+                      // Group vitals by name to show only the latest entry for each vital type
+                      Object.entries(
+                        vitalsData.reduce((acc, vital) => {
+                          if (!acc[vital.name] || new Date(acc[vital.name].date) < new Date(vital.date)) {
+                            acc[vital.name] = vital;
                           }
-                        };
-                        
-                        const value = getVitalValue();
+                          return acc;
+                        }, {} as Record<string, VitalData>)
+                      ).map(([name, vital], index) => {
+                        const isSelected = selectedVitalForGraph === name;
                         
                         return (
                           <TableRow 
-                            key={vitalType} 
-                            className={`${index % 2 === 0 ? 'bg-muted/30' : ''} cursor-pointer hover:bg-accent/50 transition-colors ${selectedVitalForGraph === vitalType ? 'ring-2 ring-primary' : ''}`}
-                            onClick={() => setSelectedVitalForGraph(vitalType)}
+                            key={`${name}-${index}`}
+                            className={`${index % 2 === 0 ? 'bg-muted/30' : ''} ${
+                              isSelected ? 'ring-2 ring-primary' : 'cursor-pointer hover:bg-accent/50'
+                            }`}
+                            onClick={() => handleVitalRowClick(name)}
                           >
-                            <TableCell className="py-1.5 px-3 font-medium text-xs">{vitalType}</TableCell>
-                            <TableCell className="py-1.5 px-3 text-right text-xs">{latestVital?.date || '-'}</TableCell>
-                            <TableCell className="py-1.5 px-3 text-right font-medium text-xs">{value}</TableCell>
+                            <TableCell className="py-2 px-3 font-medium">{name}</TableCell>
+                            <TableCell className="py-2 px-3 text-right text-xs">
+                              {vital.date ? 
+                              (vital.date) : '-'}
+                            </TableCell>
+                            <TableCell className="py-2 px-3 text-right font-medium">
+                              {vital.flag === 1 && <span className="text-red-500 mr-1">*</span>}
+                              {String(vital.value)}
+                            </TableCell>
                           </TableRow>
                         );
                       })
@@ -751,48 +729,52 @@ const VitalsView = () => {
           )}
         </div>
         <div className="basis-1/2 flex flex-col border rounded-md bg-card shadow min-h-0">
-          <div className="flex items-center p-2 border-b bg-card text-foreground rounded-t-md flex-shrink-0">
+          <div className="flex items-center p-2 border-b bg-card text-foreground rounded-t-md">
             <h2 className="text-base font-semibold">{selectedVitalForGraph} Graph</h2>
           </div>
-        <div className="flex-1 p-2">
-          <ResponsiveContainer width="100%" height="100%">
-            {selectedVitalForGraph === "B/P (mmHg)" ? (
-              <LineChart
-                data={chartData}
-                margin={{
-                  top: 5,
-                  right: 30,
-                  left: 20,
-                  bottom: 5,
-                }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis label={{ value: yAxisConfig.label, angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: 10 } }} domain={yAxisConfig.domain} tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="systolic" stroke="#8884d8" activeDot={{ r: 8 }} />
-                <Line type="monotone" dataKey="diastolic" stroke="#82ca9d" />
-              </LineChart>
-            ) : (
-              <LineChart
-                data={chartData}
-                margin={{
-                  top: 5,
-                  right: 30,
-                  left: 20,
-                  bottom: 5,
-                }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis label={{ value: yAxisConfig.label, angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: 10 } }} domain={yAxisConfig.domain} tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="value" stroke="#8884d8" activeDot={{ r: 8 }} />
-              </LineChart>
-            )}
-          </ResponsiveContainer>
+        <div className="flex-1 p-2 flex flex-col">
+          {loading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-muted-foreground">Loading chart data...</p>
+            </div>
+          ) : error ? (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-destructive">Error loading chart: {error}</p>
+            </div>
+          ) : chartData.length > 0 ? (
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="name"
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis 
+                    label={{ value: getYAxisConfig(selectedVitalForGraph).label, angle: -90, position: 'insideLeft' }}
+                    domain={getYAxisConfig(selectedVitalForGraph).domain}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Tooltip 
+                    formatter={(value: any) => [value, selectedVitalForGraph]}
+                    labelFormatter={(name) => `Record: ${name}`}
+                  />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="value" 
+                    name={selectedVitalForGraph}
+                    stroke="#8884d8" 
+                    activeDot={{ r: 8 }} 
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-muted-foreground">No data available for the selected vital</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -844,16 +826,6 @@ const IntakeOutputView = () => {
 
   const inputHeaders = ["IV FLUID", "BLOOD PRODUCT", "PO", "TUBE FEEDING", "INFUSION", "OTHER"];
   const outputHeaders = ["URINE", "N/G", "EMESIS", "DRAINAGE", "FAECES"];
-
-  const mockIntakeOutputChartData = [
-    { name: '08:00', series1: 400, series2: 240 },
-    { name: '10:00', series1: 300, series2: 139 },
-    { name: '12:00', series1: 200, series2: 980 },
-    { name: '14:00', series1: 278, series2: 390 },
-    { name: '16:00', series1: 189, series2: 480 },
-    { name: '18:00', series1: 239, series2: 380 },
-    { name: '20:00', series1: 349, series2: 430 },
-  ];
 
   const handleIntakeOutputEntryChange = (key: keyof IntakeOutputData, value: string) => {
     setIntakeOutputEntryData(prev => ({ ...prev, [key]: value }));
@@ -1088,7 +1060,7 @@ const IntakeOutputView = () => {
               type="text"
               value={fromDateValue}
               onChange={(e) => setFromDateValue(e.target.value)}
-              className="h-8 w-36 text-xs pr-8"
+              className="h-8 w-36 text-xs"
             />
             <Button variant="ghost" size="icon" className="h-7 w-7 absolute right-0.5 top-0.5 text-muted-foreground">
               <CalendarDays className="h-4 w-4" />
@@ -1101,7 +1073,7 @@ const IntakeOutputView = () => {
               type="text"
               value={toDateValueState}
               onChange={(e) => setToDateValueState(e.target.value)}
-              className="h-8 w-36 text-xs pr-8"
+              className="h-8 w-36 text-xs"
             />
             <Button variant="ghost" size="icon" className="h-7 w-7 absolute right-0.5 top-0.5 text-muted-foreground">
               <CalendarDays className="h-4 w-4" />
@@ -1322,7 +1294,10 @@ const IntakeOutputView = () => {
                     </thead>
                     <tbody className="bg-card">
                       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rowNum, index) => (
-                        <TableRow key={`data-row-${rowNum}`} className={`${index % 2 === 0 ? 'bg-muted/30' : ''} hover:bg-muted/50`}>
+                        <TableRow 
+                          key={`data-row-${rowNum}`}
+                          className={`${index % 2 === 0 ? 'bg-muted/30' : ''} hover:bg-muted/50`}
+                        >
                           {inputHeaders.map(header => (
                             <TableCell key={`input-data-${header}-${rowNum}`} className="p-1.5 border text-center font-xs h-8">-</TableCell>
                           ))}
@@ -1450,22 +1425,9 @@ const IntakeOutputView = () => {
   );
 };
 
-interface Problem {
-  id: string;
-  problem: string;
-  dateOfOnset: string;
-  status: string;
-  immediacy: string;
-  orderIen: number;
-  editUrl: string;
-  removeUrl: string;
-  viewUrl: string;
-}
-
 const ProblemsView = () => {
   const [showEntriesValue, setShowEntriesValueState] = useState<string>("10");
   const [searchValue, setSearchValueState] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<string>('A'); // 'A' for active, 'I' for inactive
   const [selectedProblem, setSelectedProblem] = useState<Problem | null>(null);
   const [isViewOpen, setIsViewOpen] = useState<boolean>(false);
   const [isPopupOpen, setIsPopupOpen] = useState<boolean>(false);
@@ -1477,7 +1439,7 @@ const ProblemsView = () => {
   
   const filteredProblems = problems.filter((problem: Problem) => {
     const matchesSearch = problem.problem.toLowerCase().includes(searchValue.toLowerCase());
-    const matchesStatus = statusFilter === 'ALL' || problem.status === statusFilter;
+    const matchesStatus = true; // TODO: Add status filter
     return matchesSearch && matchesStatus;
   });
   
@@ -1541,19 +1503,6 @@ const ProblemsView = () => {
             <Label htmlFor="showEntriesProblem" className="text-xs">entries</Label>
           </div>
           <div className="flex items-center space-x-2">
-            <Label htmlFor="statusFilter" className="text-xs">Status</Label>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger id="statusFilter" className="h-7 w-32 text-xs">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL" className="text-xs">All Status</SelectItem>
-                <SelectItem value="A" className="text-xs">Active</SelectItem>
-                <SelectItem value="I" className="text-xs">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center space-x-2">
             <Label htmlFor="searchProblem" className="text-xs">Search:</Label>
             <Input 
               id="searchProblem" 
@@ -1561,7 +1510,7 @@ const ProblemsView = () => {
               value={searchValue} 
               onChange={(e) => setSearchValueState(e.target.value)} 
               className="h-7 w-48 text-xs" 
-              placeholder="Search problems..."
+              placeholder="Search problems..." 
             />
           </div>
         </div>
@@ -1693,7 +1642,11 @@ const ProblemsView = () => {
                   Date <span className="text-red-500">*</span>
                 </Label>
                 <div className="flex-1">
-                  <Input className="h-8 text-xs pr-8" placeholder="MM/DD/YYYY" defaultValue="05/29/2025" />
+                  <Input
+                    className="h-8 text-xs pr-8"
+                    placeholder="MM/DD/YYYY"
+                    defaultValue="05/29/2025"
+                  />
                   <Button variant="ghost" size="icon" className="h-7 w-7 absolute right-0.5 top-0.5 text-muted-foreground">
                     <CalendarDays className="h-4 w-4" />
                   </Button>
@@ -1822,7 +1775,7 @@ const FinalDiagnosisView = () => {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10">
+                    <TableCell colSpan={tableHeaders.length} className="text-center py-10">
                       <div className="flex flex-col items-center justify-center space-y-2">
                         <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
                         <span>Loading diagnosis data...</span>
@@ -1831,13 +1784,13 @@ const FinalDiagnosisView = () => {
                   </TableRow>
                 ) : error ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-red-500">
+                    <TableCell colSpan={tableHeaders.length} className="text-center py-10 text-red-500">
                       Error loading diagnosis data. <Button variant="link" className="h-auto p-0 text-red-500" onClick={refresh}>Retry</Button>
                     </TableCell>
                   </TableRow>
                 ) : Object.keys(diagnosis).length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={tableHeaders.length} className="text-center py-10 text-muted-foreground">
                       No diagnosis data found
                     </TableCell>
                   </TableRow>
@@ -1978,11 +1931,11 @@ const ChiefComplaintsView = () => {
                 <TableRow>
                   {tableHeaders.map(header => (
                     <TableHead key={header} className="py-2 px-3 font-semibold h-8 whitespace-nowrap text-foreground">
-                      <div className="flex items-center justify-between">
-                        {header}
-                        <ArrowUpDown className="h-3 w-3 ml-1 text-muted-foreground hover:text-foreground cursor-pointer" />
-                      </div>
-                    </TableHead>
+                  <div className="flex items-center justify-between">
+                    {header}
+                    <ArrowUpDown className="h-3 w-3 ml-1 text-muted-foreground hover:text-foreground cursor-pointer" />
+                  </div>
+                  </TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
@@ -2352,7 +2305,7 @@ const VitalsDashboardPage: NextPage<{ patient?: Patient }> = ({ patient }) => {
 
   return (
     <div className="flex flex-col h-[calc(100vh-var(--top-nav-height,60px))] bg-background text-sm px-3 pb-3 pt-0">
-      <div className="flex items-end space-x-1 px-1 pb-0 overflow-x-auto no-scrollbar">
+      <div className="flex items-end space-x-1 px-1 pb-0 pt-1 overflow-x-auto no-scrollbar">
         {verticalNavItems.map((item) => (
           <Button
             key={item}

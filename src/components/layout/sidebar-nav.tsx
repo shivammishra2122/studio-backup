@@ -119,7 +119,7 @@ export default function SidebarNav() {
 
   return (
     <aside 
-      className={`bg-[#1a365d] text-white h-screen overflow-y-auto text-xs transition-all duration-200 ${
+      className={`bg-[#1a365d] text-white min-h-screen overflow-y-auto text-xs transition-all duration-200 ${
         isCollapsed ? 'w-12' : 'w-full max-w-xs'
       }`}
     >

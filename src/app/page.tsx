@@ -434,7 +434,7 @@ export default function DashboardPage({
   };
 
   // Handle adding new entries
-  const handleAddProblem = (dialogId: string) => {
+  const handleAddProblem = async (dialogId: string) => {
     const input = problemInputs[dialogId];
     if (!input?.input.trim()) {
       toast.error('Problem description is required.');
@@ -448,13 +448,43 @@ export default function DashboardPage({
       toast.error('Immediacy is required.');
       return;
     }
-
-    const newProb: Problem = {
-      id: Date.now().toString(),
-      description: input.input,
+  
+    // Build the API request body
+    const body = {
+      UserName: "CPRS-UAT",
+      Password: "UAT@123",
+      PatientSSN: patient?.ssn || "",
+      DUZ: "20407",                    // Replace with dynamic value if you have it
+      ihtLocation: "87",               // Replace with dynamic value if you have it
+      cdpProbL: input.input,
+      cpClinic: "",                    // No field in your state, so send empty string
+      cdpDOSet: input.dateOnset,       // Use the correct field name
+      cdpStts: input.status,
+      cdpServ: input.service || "",
+      cdpImmed: input.immediacy,
+      cdpCMT: input.comment || "",
+      cpWard: "",                      // No field in your state, so send empty string
+      DUZIP: ""                        // No field in your state, so send empty string
     };
-    toast.success('Problem added successfully!');
-    closeFloatingDialog(dialogId);
+  
+    try {
+      const res = await fetch("http://3.6.230.54:4003/api/apiProbSave.sh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const result = await res.json();
+  
+      if (result && result.success) {
+        toast.success('Problem added successfully!');
+        closeFloatingDialog(dialogId);
+        // Optionally: refresh problems list here
+      } else {
+        toast.error(result?.message || 'Failed to add problem.');
+      }
+    } catch (err) {
+      toast.error('Failed to add problem. Please try again.');
+    }
   };
 
   const handleAddMedication = (dialogId: string) => {
@@ -515,7 +545,7 @@ export default function DashboardPage({
   };
 
   return (
-    <div className="flex flex-1 flex-col p-3 bg-background relative">
+    <div className="flex flex-1 flex-col min-h-0 overflow-auto bg-background relative">
       {/* Top Row: Problems, Chart, Vital Signs */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mb-2">
         <Card className="lg:col-span-3 shadow-lg">
@@ -893,23 +923,20 @@ export default function DashboardPage({
                         
                         return medsToShow.length > 0 ? (
                           <div className="space-y-1">
-                            {medsToShow.slice(0, 3).map((med: any, index: number) => {
-                              console.log(`Rendering medication ${index}:`, med);
-                              return (
-                                <div key={`${med.id || med.medicationId || index}`} className="flex items-center justify-between py-1 px-2 hover:bg-muted/30 rounded">
-                                  <span className="text-xs truncate">
-                                    {med.name || med.medication || med.medicationName || 'Unnamed Medication'}
-                                  </span>
-                                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                    (String(med.status || '').toLowerCase() === 'active') 
-                                      ? 'bg-green-100 text-green-800' 
-                                      : 'bg-yellow-100 text-yellow-800'
-                                  }`}>
-                                    {med.status || 'Unknown'}
-                                  </span>
-                                </div>
-                              );
-                            })}
+                            {medsToShow.slice(0, 3).map((med: any, index: number) => (
+                              <div key={`${med.id || med.medicationId || index}`} className="flex items-center justify-between py-1 px-2 hover:bg-muted/30 rounded">
+                                <span className="text-xs truncate">
+                                  {med.name || med.medication || med.medicationName || 'Unnamed Medication'}
+                                </span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                  (String(med.status || '').toLowerCase() === 'active') 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {med.status || 'Unknown'}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         ) : (
                           <p className="text-xs text-muted-foreground py-2 px-2">
@@ -942,7 +969,7 @@ export default function DashboardPage({
       </div>
 
       {/* Third Row: Clinical Notes, Encounter Notes, Clinical Reminder */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-1">
         {thirdRowInformationalCardTitles.map((title) => {
           const IconComponent = infoCardIcons[title] || FileText;
           const items = dynamicPageCardContent[title] || [];
@@ -972,12 +999,12 @@ export default function DashboardPage({
                     <span className="sr-only">View {title}</span>
                   </Button>
                 </ShadcnCardHeader>
-                <CardContent className="p-0 max-h-32 overflow-y-auto no-scrollbar">
+                <CardContent className="p-0 max-h-[14rem] overflow-y-auto no-scrollbar">
                   <Table>
                     <TableBody>
                       {clinicalNotesLoading ? (
                         <TableRow>
-                          <TableCell colSpan={1} className="px-2 py-2">
+                          <TableCell colSpan={1} className="px-2 py-1.5">
                             <div className="text-xs text-muted-foreground">Loading clinical notes...</div>
                           </TableCell>
                         </TableRow>
@@ -985,7 +1012,7 @@ export default function DashboardPage({
                         clinicalNotes.slice(0, 5).map((note: ClinicalNote, index: number) => (
                           <TableRow
                             key={note.id}
-                            className={`cursor-pointer hover:bg-muted/50 ${index % 2 === 0 ? 'bg-muted/30' : ''}`}
+                            className={`h-8 cursor-pointer hover:bg-muted/50 ${index % 2 === 0 ? 'bg-muted/30' : ''}`}
                             onClick={() => {
                               // Navigate to the specific note or open a dialog
                               window.location.href = `/clinical-notes#${note.id}`;

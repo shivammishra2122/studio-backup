@@ -54,7 +54,7 @@ export function TopNav() {
   const patientId = patientMatch ? patientMatch[1] : null;
 
   return (
-    <div className="bg-card px-1 py-1 flex items-center space-x-0.5 h-8">
+    <div className="bg-card px-1 py-1 flex flex-wrap md:flex-nowrap items-center gap-1 min-h-8">
       <div className="md:hidden">
         <SidebarTrigger asChild>
           <Button variant="ghost" size="icon" className="h-7 w-7">
@@ -63,7 +63,8 @@ export function TopNav() {
         </SidebarTrigger>
       </div>
 
-      <div className="flex-grow flex items-center space-x-0.5 overflow-x-auto no-scrollbar w-[1040px]">
+      {/* Nav buttons container: wraps on small screens, no fixed width */}
+      <div className="flex flex-wrap md:flex-nowrap items-center gap-0.5 overflow-x-auto no-scrollbar flex-1">
         {navButtonLabels.map((label) => {
           let href = "#";
           if (patientId) {
