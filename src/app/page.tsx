@@ -867,14 +867,14 @@ export default function DashboardPage({
                   <span className="sr-only">Edit {title}</span>
                 </Button>
               </ShadcnCardHeader>
-              <CardContent className="p-0 max-h-32 overflow-y-auto no-scrollbar">
+              <CardContent className="p-0 max-h-[160px] overflow-hidden">
                 <Table>
                   <TableBody>
                     {title === 'Allergies' ? (
                       allergiesToShow.length > 0 ? (
                         <Table>
                           <TableBody>
-                            {allergiesToShow.map((allergy: any, index: number) => (
+                            {allergiesToShow.slice(0, 5).map((allergy: any, index: number) => (
                               <TableRow
                                 key={allergy['Order IEN'] || index}
                                 className={`cursor-pointer hover:bg-muted/50 ${index % 2 === 0 ? 'bg-muted/30' : ''}`}
@@ -923,7 +923,7 @@ export default function DashboardPage({
                         
                         return medsToShow.length > 0 ? (
                           <div className="space-y-1">
-                            {medsToShow.slice(0, 3).map((med: any, index: number) => (
+                            {medsToShow.slice(0, 5).map((med: any, index: number) => (
                               <div key={`${med.id || med.medicationId || index}`} className="flex items-center justify-between py-1 px-2 hover:bg-muted/30 rounded">
                                 <span className="text-xs truncate">
                                   {med.name || med.medication || med.medicationName || 'Unnamed Medication'}
@@ -945,7 +945,7 @@ export default function DashboardPage({
                         );
                       })()
                     ) : (
-                      (items as string[]).map((item, index) => (
+                      (items as string[]).slice(0, 5).map((item, index) => (
                         <TableRow
                           key={index}
 
@@ -999,7 +999,7 @@ export default function DashboardPage({
                     <span className="sr-only">View {title}</span>
                   </Button>
                 </ShadcnCardHeader>
-                <CardContent className="p-0 max-h-[14rem] overflow-y-auto no-scrollbar">
+                <CardContent className="p-0 max-h-[160px] overflow-hidden">
                   <Table>
                     <TableBody>
                       {clinicalNotesLoading ? (
@@ -1060,10 +1060,10 @@ export default function DashboardPage({
                   <span className="sr-only">Edit {title}</span>
                 </Button>
               </ShadcnCardHeader>
-              <CardContent className="p-0 max-h-24 overflow-y-auto no-scrollbar">
+              <CardContent className="p-0 max-h-[160px] overflow-hidden">
                 <Table>
                   <TableBody>
-                    {items.map((item, index) => (
+                    {items.slice(0, 5).map((item, index) => (
                       <TableRow
                         key={index}
 
