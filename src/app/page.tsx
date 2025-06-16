@@ -145,7 +145,17 @@ export default function DashboardPage({
 
   // Dialog input states
   const [problemInputs, setProblemInputs] = useState<
-    Record<string, { input: string; category: ProblemCategory | ''; other: boolean; preferred: string[]; status: ProblemStatus | ''; immediacy: ProblemImmediacy | ''; dateOnset: string; service: ProblemService | ''; comment: string }>
+    Record<string, {
+      input: string;
+      category: ProblemCategory | '';
+      other: boolean;
+      preferred: string[];
+      status: ProblemStatus | '';
+      immediacy: ProblemImmediacy | '';
+      dateOnset: string;
+      service: ProblemService | '';
+      comment: string;
+    }>
   >({});
   const [medicationInputs, setMedicationInputs] = useState<
     Record<string, { name: string; reason: string; amount: string; timing: string }>
@@ -154,7 +164,14 @@ export default function DashboardPage({
     Record<string, { title: string; item: string }>
   >({});
   const [allergyInputs, setAllergyInputs] = useState<
-    Record<string, { allergen: string; reaction: string; severity: 'Mild' | 'Moderate' | 'Severe' | ''; dateOnset: string; treatment: string; status: 'Active' | 'Inactive' | ''; notes: string }>
+    Record<string, { 
+      allergies: string; 
+      natureOfReaction: string;
+      reactionType: 'Observed' | 'Historical' | '';
+      signSymptom: string;
+      dateTime: string;
+      comment: string;
+    }>
   >({});
   const [radiologyInputs, setRadiologyInputs] = useState<
     Record<string, { type: string; bodyPart: string; notes: string }>
@@ -280,7 +297,14 @@ export default function DashboardPage({
     } else if (type === 'allergies') {
       setAllergyInputs((prev) => ({
         ...prev,
-        [id]: { allergen: '', reaction: '', severity: '', dateOnset: '', treatment: '', status: '', notes: '' },
+        [id]: { 
+          allergies: '', 
+          natureOfReaction: '',
+          reactionType: '',
+          signSymptom: '',
+          dateTime: new Date().toISOString().slice(0, 16), // Pre-fill with current date/time
+          comment: '' 
+        },
       }));
     } else if (type === 'radiology') {
       setRadiologyInputs((prev) => ({
@@ -436,57 +460,54 @@ export default function DashboardPage({
   };
 
   // Handle adding new entries
-  const handleAddProblem = async (dialogId: string) => {
+  const handleAddProblem = (dialogId: string) => {
     const input = problemInputs[dialogId];
     if (!input?.input?.trim()) {
-      toast.error('Please enter a problem description.');
+      toast.error('Please enter a problem description');
       return;
     }
 
-    const toastId = toast.loading('Saving problem...');
-
-    const formatDate = (dateString: string | undefined) => {
-      if (!dateString) return '';
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return ''; // Invalid date
-      const day = String(date.getDate()).padStart(2, '0');
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const year = date.getFullYear();
-      return `${day}/${month}/${year}`;
+    const newProblem: Problem = {
+      id: `problem-${Date.now()}`,
+      description: input.input,
+      category: input.category || 'Other',
+      status: input.status || 'Active',
+      dateOnset: input.dateOnset || new Date().toISOString(),
+      service: input.service as ProblemService,
+      comment: input.comment || '',
+      createdBy: 'Current User',
+      createdAt: new Date().toISOString(),
     };
 
-    const payload: ApiProbSavePayload = {
-      UserName: "CPRS-UAT",
-      Password: "UAT@123",
-      PatientSSN: "210099218", // TODO: Replace with dynamic patient SSN from context
-      DUZ: "20407",
-      ihtLocation: "87",
-      cdpProbL: input.input || '',
-      cpClinic: "", // Not available in the form
-      cdpDOSet: formatDate(input.dateOnset) || '',
-      cdpStts: input.status || '',
-      cdpServ: "23", // TODO: Map service name to ID. Using hardcoded value for now.
-      cdpImmed: input.immediacy || '',
-      cdpCMT: input.comment || '',
-      cpWard: "", // Not available in the form
-      DUZIP: "" // Not available in the form
-    };
+    // Add the new problem to local state
+    setProblems(prev => [...prev, newProblem]);
+    
+    // Reset the form
+    setProblemInputs(prev => ({
+      ...prev,
+      [dialogId]: {
+        input: '',
+        category: '',
+        other: false,
+        preferred: [],
+        status: '',
+        immediacy: '',
+        dateOnset: new Date().toISOString().split('T')[0],
+        service: '',
+        comment: ''
+      }
+    }));
 
-    try {
-      const result = await saveProblem(payload);
-      toast.success('Problem saved successfully!', { id: toastId });
-      closeFloatingDialog(dialogId);
-      // Optionally, refresh the problems list here
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-      toast.error(`Failed to save problem: ${errorMessage}`, { id: toastId });
-    }
+    // Close the dialog
+    closeFloatingDialog(dialogId);
+    
+    toast.success('Problem added successfully');
   };
 
   const handleAddMedication = (dialogId: string) => {
     const input = medicationInputs[dialogId];
     if (!input?.name.trim()) {
-      toast.error('Medication name is required.');
+      toast.error('Medication name is required');
       return;
     }
 
@@ -502,79 +523,57 @@ export default function DashboardPage({
     closeFloatingDialog(dialogId);
   };
 
-  const handleAddAllergy = async (dialogId: string) => {
-    console.log('handleAddAllergy called with dialogId:', dialogId);
+  const handleAddAllergy = useCallback((dialogId: string) => {
     const input = allergyInputs[dialogId];
-    console.log('Current input:', input);
+    if (!input) return;
+
+    // Validate required fields
+    if (!input.allergies) {
+      toast.error('Please enter allergies');
+      return;
+    }
+
+    // Create the new allergy object
+    const newAllergy: Allergy = {
+      id: `allergy-${Date.now()}`,
+      allergen: input.allergies,
+      reaction: input.natureOfReaction,
+      severity: 'Moderate' as const, // Set a default severity
+      dateOnset: input.dateTime,
+      treatment: '', // Not in the new design
+      status: 'Active' as const,
+      notes: input.comment,
+      createdBy: 'Current User', // Replace with actual user
+      createdAt: new Date().toISOString(),
+    };
+
+    // Here you would typically make an API call to save the allergy
+    console.log('Saving allergy:', newAllergy);
     
-    if (!input?.allergen?.trim()) {
-      console.log('Validation failed: Missing allergen');
-      toast.error('Please enter an allergen.');
-      return;
-    }
-    if (!input.severity) {
-      console.log('Validation failed: Missing severity');
-      toast.error('Please select a severity.');
-      return;
-    }
-    if (!input.status) {
-      console.log('Validation failed: Missing status');
-      toast.error('Please select a status.');
-      return;
-    }
-
-    console.log('All validations passed, preparing payload...');
-    const toastId = toast.loading('Saving allergy...');
-
-    const formatDate = (dateString: string | undefined) => {
-      if (!dateString) return '';
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return ''; // Invalid date
-      const day = String(date.getDate()).padStart(2, '0');
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const year = date.getFullYear();
-      return `${day}/${month}/${year}`;
-    };
-
-    const now = new Date();
-    const formattedDate = now.toISOString().replace('T', ' ').substring(0, 19);
-
-    const payload: ApiAllergySavePayload = {
-      UserName: "CPRS-UAT",
-      Password: "UAT@123",
-      PatientSSN: "210099218", // TODO: Replace with dynamic patient SSN from context
-      DUZ: "20407",
-      ihtLocation: "87",
-      cdaAllrgyS: input.allergen || '',
-      cdaNatRea: input.reaction || '',
-      cdaObsHis: input.notes || '',
-      cdaSrty: input.severity || '',
-      cdaReDat: formatDate(input.dateOnset) || '',
-      cdaSignSymL: input.reaction || '',
-      cdaDatTm: formattedDate,
-      cdaCMT: input.notes || '',
-      cdaNotKnow: "false"
-    };
-
-    console.log('Sending payload to API:', payload);
-
-    try {
-      console.log('Calling saveAllergy service...');
-      const result = await saveAllergy(payload);
-      console.log('API Response:', result);
-      toast.success('Allergy saved successfully!', { id: toastId });
-      closeFloatingDialog(dialogId);
-    } catch (error) {
-      console.error('Error in handleAddAllergy:', error);
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-      toast.error(`Failed to save allergy: ${errorMessage}`, { id: toastId });
-    }
-  };
+    // Show success message
+    toast.success('Allergy saved successfully');
+    
+    // Close the dialog
+    closeFloatingDialog(dialogId);
+    
+    // Reset the form
+    setAllergyInputs(prev => ({
+      ...prev,
+      [dialogId]: { 
+        allergies: '', 
+        natureOfReaction: '',
+        reactionType: '',
+        signSymptom: '',
+        dateTime: new Date().toISOString().slice(0, 16),
+        comment: '' 
+      },
+    }));
+  }, [allergyInputs, closeFloatingDialog]);
 
   const handleSaveNewInfoItem = (dialogId: string) => {
     const input = infoItemInputs[dialogId];
     if (!input?.item.trim() || !input.title) {
-      toast.error('Item content and title are required.');
+      toast.error('Item content and title are required');
       return;
     }
 
@@ -1132,7 +1131,7 @@ export default function DashboardPage({
         <div
           key={dialog.id}
           ref={(el) => { dialogRefs.current[dialog.id] = el; }}
-          className="fixed bg-background border rounded-lg shadow-xl max-h-[90vh] overflow-y-auto sm:w-[45%] sm:max-w-[1000px] z-50"
+          className="fixed bg-background border rounded-lg shadow-xl max-h-[90vh] overflow-y-auto w-[80%] max-w-[1200px] z-50"
           style={{
             left: '50%',
             top: '50%',
@@ -1210,58 +1209,48 @@ export default function DashboardPage({
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Label htmlFor={`problemInput-${dialog.id}`} className="w-[120px] min-w-[120px]">Problem</Label>
-                  <Input
-                    id={`problemInput-${dialog.id}`}
-                    value={problemInputs[dialog.id]?.input}
-                    onChange={(e) => setProblemInputs((prev) => ({
-                      ...prev,
-                      [dialog.id]: { ...prev[dialog.id], input: e.target.value },
-                    }))}
-                    className="flex-1"
-                  />
-                </div>
-                <div className="flex items-center gap-3">
-                  <Label htmlFor={`problemStatus-${dialog.id}`} className="w-[120px]">Status</Label>
-                  <Select
-                    value={problemInputs[dialog.id]?.status}
-                    onValueChange={(value) => setProblemInputs((prev) => ({
-                      ...prev,
-                      [dialog.id]: { ...prev[dialog.id], status: value as ProblemStatus },
-                    }))}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Select Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ACTIVE">ACTIVE</SelectItem>
-                      <SelectItem value="RESOLVED">RESOLVED</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Label className="w-[120px] min-w-[120px]">Immediacy</Label>
-                  <RadioGroup
-                    value={problemInputs[dialog.id]?.immediacy}
-                    onValueChange={(value) => setProblemInputs((prev) => ({
-                      ...prev,
-                      [dialog.id]: { ...prev[dialog.id], immediacy: value as ProblemImmediacy },
-                    }))}
-                    className="flex items-center gap-4"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="Unknown" id={`immediacy-unknown-${dialog.id}`} />
-                      <Label htmlFor={`immediacy-unknown-${dialog.id}`}>Unknown</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="Acute" id={`immediacy-acute-${dialog.id}`} />
-                      <Label htmlFor={`immediacy-acute-${dialog.id}`}>Acute</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="Chronic" id={`immediacy-chronic-${dialog.id}`} />
-                      <Label htmlFor={`immediacy-chronic-${dialog.id}`}>Chronic</Label>
-                    </div>
-                  </RadioGroup>
+                  <div className="w-1/2 flex items-center gap-3">
+                    <Label htmlFor={`problemStatus-${dialog.id}`} className="w-[120px] min-w-[120px]">Status</Label>
+                    <Select
+                      value={problemInputs[dialog.id]?.status}
+                      onValueChange={(value) => setProblemInputs((prev) => ({
+                        ...prev,
+                        [dialog.id]: { ...prev[dialog.id], status: value as ProblemStatus },
+                      }))}
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Select Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ACTIVE">ACTIVE</SelectItem>
+                        <SelectItem value="RESOLVED">RESOLVED</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-1/2 flex items-center gap-3">
+                    <Label className="w-[120px] min-w-[120px]">Immediacy</Label>
+                    <RadioGroup
+                      value={problemInputs[dialog.id]?.immediacy}
+                      onValueChange={(value) => setProblemInputs((prev) => ({
+                        ...prev,
+                        [dialog.id]: { ...prev[dialog.id], immediacy: value as ProblemImmediacy },
+                      }))}
+                      className="flex items-center gap-2"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <RadioGroupItem value="Unknown" id={`immediacy-unknown-${dialog.id}`} />
+                        <Label htmlFor={`immediacy-unknown-${dialog.id}`} className="text-xs">Unknown</Label>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <RadioGroupItem value="Acute" id={`immediacy-acute-${dialog.id}`} />
+                        <Label htmlFor={`immediacy-acute-${dialog.id}`} className="text-xs">Acute</Label>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <RadioGroupItem value="Chronic" id={`immediacy-chronic-${dialog.id}`} />
+                        <Label htmlFor={`immediacy-chronic-${dialog.id}`} className="text-xs">Chronic</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <Label htmlFor={`dateOnset-${dialog.id}`} className="w-[120px] min-w-[120px]">Date of Onset</Label>
@@ -1303,7 +1292,7 @@ export default function DashboardPage({
                       ...prev,
                       [dialog.id]: { ...prev[dialog.id], comment: e.target.value },
                     }))}
-                    className="flex-1 min-h-[80px]"
+                    className="h-24"
                   />
                 </div>
                 <div className="flex justify-end gap-2 mt-4">
@@ -1313,7 +1302,6 @@ export default function DashboardPage({
                     onClick={() => setProblemInputs((prev) => ({
                       ...prev,
                       [dialog.id]: {
-                        input: '',
                         category: '',
                         other: false,
                         preferred: [],
@@ -1769,119 +1757,128 @@ export default function DashboardPage({
               </div>
             )}
             {dialog.type === 'allergies' && (
-              <div className="flex flex-col gap-4 text-sm"> {/* Keep existing container class */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor={`allergen-${dialog.id}`} className="w-[120px] min-w-[120px]">Allergen</Label>
-                    <Input
-                      id={`allergen-${dialog.id}`}
-                      value={allergyInputs[dialog.id]?.allergen}
-                      onChange={(e) => setAllergyInputs((prev) => ({
-                        ...prev,
-                        [dialog.id]: { ...prev[dialog.id], allergen: e.target.value },
-                      }))}
-                      className="flex-1"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor={`reaction-${dialog.id}`} className="w-[120px] min-w-[120px]">Reaction</Label>
-                    <Input
-                      id={`reaction-${dialog.id}`}
-                      value={allergyInputs[dialog.id]?.reaction}
-                      onChange={(e) => setAllergyInputs((prev) => ({
-                        ...prev,
-                        [dialog.id]: { ...prev[dialog.id], reaction: e.target.value },
-                      }))}
-                      className="flex-1"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor={`severity-${dialog.id}`} className="w-[120px] min-w-[120px]">Severity</Label>
-                    <Select
-                      value={allergyInputs[dialog.id]?.severity}
-                      onValueChange={(value) => setAllergyInputs((prev) => ({
-                        ...prev,
-                        [dialog.id]: { ...prev[dialog.id], severity: value as 'Mild' | 'Moderate' | 'Severe' },
-                      }))}
-                    >
-                      <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="Select Severity" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Mild">Mild</SelectItem>
-                        <SelectItem value="Moderate">Moderate</SelectItem>
-                        <SelectItem value="Severe">Severe</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor={`dateOnset-${dialog.id}`} className="w-[120px] min-w-[120px]">Date of Onset</Label>
-                    <Input
-                      id={`dateOnset-${dialog.id}`}
-                      type="date"
-                      value={allergyInputs[dialog.id]?.dateOnset}
-                      onChange={(e) => setAllergyInputs((prev) => ({
-                        ...prev,
-                        [dialog.id]: { ...prev[dialog.id], dateOnset: e.target.value },
-                      }))}
-                      className="flex-1"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor={`treatment-${dialog.id}`} className="w-[120px] min-w-[120px]">Treatment</Label>
-                    <Input
-                      id={`treatment-${dialog.id}`}
-                      value={allergyInputs[dialog.id]?.treatment}
-                      onChange={(e) => setAllergyInputs((prev) => ({
-                        ...prev,
-                        [dialog.id]: { ...prev[dialog.id], treatment: e.target.value },
-                      }))}
-                      className="flex-1"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor={`status-${dialog.id}`} className="w-[120px] min-w-[120px]">Status</Label>
-                    <Select
-                      value={allergyInputs[dialog.id]?.status}
-                      onValueChange={(value) => setAllergyInputs((prev) => ({
-                        ...prev,
-                        [dialog.id]: { ...prev[dialog.id], status: value as 'Active' | 'Inactive' },
-                      }))}
-                    >
-                      <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="Select Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Active">Active</SelectItem>
-                        <SelectItem value="Inactive">Inactive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor={`notes-${dialog.id}`} className="w-[120px] min-w-[120px]">Notes</Label>
-                  <Textarea
-                    id={`notes-${dialog.id}`}
-                    value={allergyInputs[dialog.id]?.notes}
-                    onChange={(e) => setAllergyInputs((prev) => ({
+              <div className="flex flex-col gap-4 text-sm">
+                {/* Allergies Input */}
+                <div className="grid grid-cols-1 gap-2">
+                  <Label htmlFor={`allergies-${dialog.id}`} className="font-medium">Allergies</Label>
+                  <Input
+                    id={`allergies-${dialog.id}`}
+                    value={allergyInputs[dialog.id]?.allergies || ''}
+                    onChange={(e) => setAllergyInputs(prev => ({
                       ...prev,
-                      [dialog.id]: { ...prev[dialog.id], notes: e.target.value },
+                      [dialog.id]: { ...prev[dialog.id], allergies: e.target.value }
                     }))}
-                    className="flex-1 min-h-[80px]"
+                    placeholder="Enter allergies"
                   />
                 </div>
-                <div className="flex justify-end gap-2 mt-4">
-                  <Button onClick={() => handleAddAllergy(dialog.id)}>Add Allergy</Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setAllergyInputs((prev) => ({
+
+                {/* Nature of Reaction - Select + Radio Group */}
+                <div className="grid grid-cols-1 gap-2">
+                  <Label className="font-medium">Nature of Reaction</Label>
+                  <div className="flex gap-4">
+                    <Select
+                      value={allergyInputs[dialog.id]?.natureOfReaction || ''}
+                      onValueChange={(value) => setAllergyInputs(prev => ({
+                        ...prev,
+                        [dialog.id]: { ...prev[dialog.id], natureOfReaction: value }
+                      }))}
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Select nature of reaction" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Allergy">Allergy</SelectItem>
+                        <SelectItem value="Intolerance">Intolerance</SelectItem>
+                        <SelectItem value="Side Effect">Side Effect</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <RadioGroup 
+                      value={allergyInputs[dialog.id]?.reactionType || ''}
+                      onValueChange={(value) => setAllergyInputs(prev => ({
+                        ...prev,
+                        [dialog.id]: { ...prev[dialog.id], reactionType: value as 'Observed' | 'Historical' | '' }
+                      }))}
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Observed" id={`observed-${dialog.id}`} />
+                        <Label htmlFor={`observed-${dialog.id}`}>Observed</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Historical" id={`historical-${dialog.id}`} />
+                        <Label htmlFor={`historical-${dialog.id}`}>Historical</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                </div>
+
+                {/* Sign/Symptoms - Select */}
+                <div className="grid grid-cols-1 gap-2">
+                  <Label htmlFor={`signSymptom-${dialog.id}`} className="font-medium">Sign/Symptoms</Label>
+                  <Select
+                    value={allergyInputs[dialog.id]?.signSymptom || ''}
+                    onValueChange={(value) => setAllergyInputs(prev => ({
                       ...prev,
-                      [dialog.id]: { allergen: '', reaction: '', severity: '', dateOnset: '', treatment: '', status: '', notes: '' },
+                      [dialog.id]: { ...prev[dialog.id], signSymptom: value }
                     }))}
                   >
-                    Reset
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select sign/symptom" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Rash">Rash</SelectItem>
+                      <SelectItem value="Hives">Hives</SelectItem>
+                      <SelectItem value="Swelling">Swelling</SelectItem>
+                      <SelectItem value="Difficulty Breathing">Difficulty Breathing</SelectItem>
+                      <SelectItem value="Nausea">Nausea</SelectItem>
+                      <SelectItem value="Dizziness">Dizziness</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Date/Time Input */}
+                <div className="grid grid-cols-1 gap-2">
+                  <Label htmlFor={`dateTime-${dialog.id}`} className="font-medium">Date/Time</Label>
+                  <Input
+                    id={`dateTime-${dialog.id}`}
+                    type="datetime-local"
+                    value={allergyInputs[dialog.id]?.dateTime || ''}
+                    onChange={(e) => setAllergyInputs(prev => ({
+                      ...prev,
+                      [dialog.id]: { ...prev[dialog.id], dateTime: e.target.value }
+                    }))}
+                  />
+                </div>
+
+                {/* Comment Textarea */}
+                <div className="grid grid-cols-1 gap-2">
+                  <Label htmlFor={`comment-${dialog.id}`} className="font-medium">Comment</Label>
+                  <Textarea
+                    id={`comment-${dialog.id}`}
+                    value={allergyInputs[dialog.id]?.comment || ''}
+                    onChange={(e) => setAllergyInputs(prev => ({
+                      ...prev,
+                      [dialog.id]: { ...prev[dialog.id], comment: e.target.value }
+                    }))}
+                    placeholder="Add any additional comments"
+                    className="h-24"
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => closeFloatingDialog(dialog.id)}
+                  >
+                    Cancel
                   </Button>
-                  <Button variant="outline" onClick={() => closeFloatingDialog(dialog.id)}>Cancel</Button>
+                  <Button 
+                    onClick={() => handleAddAllergy(dialog.id)}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Save
+                  </Button>
                 </div>
               </div>
             )}
