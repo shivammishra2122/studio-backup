@@ -1,4 +1,3 @@
-
 import type { ReactNode } from 'react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 
@@ -10,18 +9,28 @@ type PageHeaderProps = {
 
 export function PageHeader({ title, description, action }: PageHeaderProps) {
   return (
-    <div className="mb-6 flex flex-col gap-y-2 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-2">
+    <div className="mb-6 flex w-full flex-col gap-y-3 sm:flex-row sm:items-center sm:justify-between sm:gap-y-0">
+      <div className="flex w-full items-start gap-2 sm:items-center">
         {/* SidebarTrigger is now only visible on mobile (md:hidden) */}
         <div className="md:hidden">
           <SidebarTrigger />
         </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{title}</h1>
-          {description && <p className="text-muted-foreground">{description}</p>}
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-xl font-bold tracking-tight text-foreground sm:text-2xl md:text-3xl">
+            {title}
+          </h1>
+          {description && (
+            <p className="mt-1 truncate text-sm text-muted-foreground sm:text-base">
+              {description}
+            </p>
+          )}
         </div>
       </div>
-      {action && <div>{action}</div>}
+      {action && (
+        <div className="mt-2 flex-shrink-0 sm:mt-0">
+          {action}
+        </div>
+      )}
     </div>
   );
 }

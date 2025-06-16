@@ -200,3 +200,46 @@ export async function fetchClinicalNotes({
         return [];
     }
 } 
+export interface ProblemSearchParams {
+    UserName: string;
+    Password: string;
+    PatientSSN: string;
+    DUZ: string;
+    cdpProbCat?: string;
+    other?: string;
+  }
+  
+  export interface Problem {
+    id: string;
+    problem: string;
+    dateOfOnset: string;
+    status: string;
+    immediacy: string;
+    orderIen: number;
+    editUrl: string;
+    removeUrl: string;
+    viewUrl: string;
+  }
+  
+  export const problemService = {
+    searchProblems: async (params: ProblemSearchParams): Promise<Problem[]> => {
+      try {
+        const response = await axios.post(`${API_BASE_URL}/apiProbCatSrh.sh`, params);
+        // Transform the API response to match our Problem interface
+        return response.data.map((item: any) => ({
+          id: item.id || '',
+          problem: item.problem || '',
+          dateOfOnset: item.dateOfOnset || '',
+          status: item.status || '',
+          immediacy: item.immediacy || '',
+          orderIen: item.orderIen || 0,
+          editUrl: item.editUrl || '',
+          removeUrl: item.removeUrl || '',
+          viewUrl: item.viewUrl || '',
+        }));
+      } catch (error) {
+        console.error('Error searching problems:', error);
+        throw error;
+      }
+    }
+  };

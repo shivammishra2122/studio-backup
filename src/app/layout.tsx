@@ -2,9 +2,6 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import ClientProviders from '@/components/providers/client-providers';
 
-// Mock patient data for development
-// @ts-ignore - Mock data for development only 
-
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
@@ -22,9 +19,21 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}>
+      <body className={`
+        ${geistSans.variable} 
+        ${geistMono.variable} 
+        antialiased 
+        flex 
+        flex-col 
+        min-h-screen
+        bg-background 
+        text-foreground 
+        overflow-x-hidden
+      `}>
         <ClientProviders>
-          {children}
+          <main className="flex-1 w-full min-h-screen">
+            {children}
+          </main>
         </ClientProviders>
       </body>
     </html>

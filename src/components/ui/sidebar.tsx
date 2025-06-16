@@ -22,9 +22,9 @@ import {
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "12rem"; // Reduced from 13rem
-const SIDEBAR_WIDTH_MOBILE = "18rem"
-const SIDEBAR_WIDTH_ICON = "3rem"
+const SIDEBAR_WIDTH = "12rem"; 
+const SIDEBAR_WIDTH_MOBILE = "calc(100vw - 3rem)"
+const SIDEBAR_WIDTH_ICON = "3.5rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContext = {
@@ -113,6 +113,17 @@ const SidebarProvider = React.forwardRef<
       return () => window.removeEventListener("keydown", handleKeyDown)
     }, [toggleSidebar])
 
+    React.useEffect(() => {
+      const handleResize = () => {
+        if (window.innerWidth >= 768) { 
+          setOpenMobile(false)
+        }
+      }
+
+      window.addEventListener('resize', handleResize)
+      return () => window.removeEventListener('resize', handleResize)
+    }, [])
+
     const state = open ? "expanded" : "collapsed"
 
     const contextValue = React.useMemo<SidebarContext>(
@@ -135,6 +146,7 @@ const SidebarProvider = React.forwardRef<
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH,
+                "--sidebar-width-mobile": SIDEBAR_WIDTH_MOBILE,
                 "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
                 ...style,
               } as React.CSSProperties
@@ -197,7 +209,7 @@ const Sidebar = React.forwardRef<
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
-            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+            className="w-[--sidebar-width-mobile] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -272,35 +284,51 @@ const Sidebar = React.forwardRef<
 Sidebar.displayName = "Sidebar"
 
 const SidebarTrigger = React.forwardRef<
-  React.ElementRef<typeof Button>,
-  React.ComponentProps<typeof Button> & { asChild?: boolean }
->(({ className, onClick, asChild = false, children: propChildren, ...props }, ref) => {
-  const { toggleSidebar } = useSidebar();
+  React.ElementRef<"button">,
+  React.ComponentPropsWithoutRef<"button"> & {
+    asChild?: boolean
+  }
+>(({ className, asChild = false, ...props }, ref) => {
+  const { toggleSidebar, isMobile } = useSidebar()
+  const Comp = asChild ? Slot : "button"
 
-  const Comp = asChild ? Slot : Button;
+  if (isMobile) {
+    return (
+      <Comp
+        ref={ref}
+        className={cn(
+          "inline-flex items-center justify-center rounded-md p-2 text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          className
+        )}
+        onClick={toggleSidebar}
+        aria-label="Toggle sidebar"
+        {...props}
+      >
+        <PanelLeft className="h-5 w-5" />
+      </Comp>
+    )
+  }
 
   return (
-    <Comp
-      ref={ref}
-      data-sidebar="trigger"
-      variant="ghost"
-      size="icon"
-      className={cn("h-7 w-7", className)}
-      onClick={(event) => {
-        onClick?.(event);
-        toggleSidebar();
-      }}
-      {...props}
-    >
-      {asChild ? propChildren : (
-        <>
-          <PanelLeft />
-          <span className="sr-only">Toggle Sidebar</span>
-        </>
-      )}
-    </Comp>
-  );
-});
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Comp
+          ref={ref}
+          className={cn(
+            "inline-flex h-9 w-9 items-center justify-center rounded-md p-2 text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            className
+          )}
+          onClick={toggleSidebar}
+          aria-label="Toggle sidebar"
+          {...props}
+        >
+          <PanelLeft className="h-5 w-5" />
+        </Comp>
+      </TooltipTrigger>
+      <TooltipContent side="right">Toggle sidebar</TooltipContent>
+    </Tooltip>
+  )
+})
 SidebarTrigger.displayName = "SidebarTrigger"
 
 const SidebarRail = React.forwardRef<

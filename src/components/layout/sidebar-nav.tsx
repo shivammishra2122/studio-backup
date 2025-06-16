@@ -21,16 +21,18 @@ import {
   HeartPulse
 } from 'lucide-react';
 import { useSidebar } from "@/components/ui/sidebar";
+import { PatientDetailsModal } from "@/components/patient-details-modal";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 
 const navItems: { name: string; icon: any; href: string }[] = [];
-
-
 
 export default function SidebarNav() {
   const { id } = useParams();
   const pathname = usePathname();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isPatientDetailsOpen, setIsPatientDetailsOpen] = useState(false);
   const { state: sidebarState } = useSidebar();
   const isCollapsed = sidebarState === 'collapsed';
 
@@ -111,11 +113,15 @@ export default function SidebarNav() {
   );
 
   // Format Gender initial and Age
-  const genderInitial = patient.gender ? patient.gender.charAt(0).toUpperCase() : '';
-  const formattedPatientInfo = `${patient.name} (${genderInitial} ${patient.age})`;
+  const genderInitial = patient?.gender ? patient.gender.charAt(0).toUpperCase() : '';
+  const formattedPatientInfo = patient ? `${patient.name} (${genderInitial} ${patient.age})` : '';
 
-  // Navigation items component (empty for now)
-  const renderNavigationItems = () => null;
+  const handlePatientNameClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (patient) {
+      setIsPatientDetailsOpen(true);
+    }
+  };
 
   return (
     <aside 
@@ -124,19 +130,24 @@ export default function SidebarNav() {
       }`}
     >
       <div className="flex flex-col items-center">
-        {!isCollapsed && (
+        {!isCollapsed && patient && (
           <>
             {/* Avatar Placeholder */}
             <div className="w-16 h-16 rounded-full bg-[#2c5282] flex items-center justify-center mb-2 mt-4">
               <User className="w-10 h-10 text-blue-200" />
             </div>
             {/* Patient Name (Gender Age) */}
-            <div className="text-sm font-semibold text-center mb-4 text-white">{formattedPatientInfo}</div>
+            <button 
+              onClick={handlePatientNameClick}
+              className="text-sm font-semibold text-center mb-4 text-white hover:underline cursor-pointer"
+            >
+              {formattedPatientInfo}
+            </button>
           </>
         )}
         
         {/* Navigation Items */}
-        {renderNavigationItems()}
+        {/* {renderNavigationItems()} */}
 
         {!isCollapsed && (
           <>
@@ -185,6 +196,15 @@ export default function SidebarNav() {
           </>
         )}
       </div>
+
+      {/* Patient Details Modal */}
+      {patient && (
+        <PatientDetailsModal
+          isOpen={isPatientDetailsOpen}
+          onClose={() => setIsPatientDetailsOpen(false)}
+          patient={patient}
+        />
+      )}
     </aside>
   );
 }

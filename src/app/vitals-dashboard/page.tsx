@@ -120,7 +120,7 @@ const VitalsView = () => {
   const [visitDateState, setVisitDateState] = useState<string | undefined>("today");
   const [fromDateValue, setFromDateValue] = useState<string>("");
   const [toDateValueState, setToDateValueState] = useState<string>("");
-  const [selectedVitalForGraph, setSelectedVitalForGraph] = useState<string>(vitalTypes[0]);
+  const [selectedVitalForGraph, setSelectedVitalForGraph] = useState<string>("Temp (F)");
   const [chartData, setChartData] = useState<VitalChartDataPoint[]>([]);
   const [isEnteredInError, setIsEnteredInError] = useState<boolean>(false);
   const [isVitalsEntryMode, setIsVitalsEntryMode] = useState<boolean>(false);
@@ -156,7 +156,6 @@ const VitalsView = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showEntries, setShowEntries] = useState<string>("10");
-  const [dateRange, setDateRange] = useState<number[]>([0, 7]); // Default: last 7 days
 
   const yAxisConfig = getYAxisConfig(selectedVitalForGraph);
 
@@ -275,9 +274,14 @@ const VitalsView = () => {
       console.log('Transformed Vitals Data:', transformedData);
       setVitalsData(transformedData);
       
-      // Set default selected vital if not already set
-      if (transformedData.length > 0 && !selectedVitalForGraph) {
-        setSelectedVitalForGraph(transformedData[0].name);
+      // Set default selected vital if not already set or if we have data now
+      if (transformedData.length > 0) {
+        const tempVital = transformedData.find(v => v.name === 'Temp');
+        if (tempVital) {
+          setSelectedVitalForGraph('Temp');
+        } else if (!selectedVitalForGraph) {
+          setSelectedVitalForGraph(transformedData[0].name);
+        }
       }
     } catch (err) {
       console.error('Error fetching vitals:', err);
@@ -328,10 +332,34 @@ const VitalsView = () => {
     fetchVitalsData();
   }, [fetchVitalsData]);
 
-  const handleDateRangeChange = (value: number[]) => {
-    setDateRange(value);
-    setVisitDateState('custom'); // Set to custom when slider is used
-  };
+  useEffect(() => {
+    if (vitalsData.length > 0 && selectedVitalForGraph) {
+      const selectedVitalData = vitalsData
+        .filter(vital => vital.name === selectedVitalForGraph && vital.value !== undefined)
+        .map((vital, index) => {
+          let numericValue: number | null = null;
+          
+          if (typeof vital.value === 'string') {
+            const match = String(vital.value).match(/(\d+\.?\d*)/);
+            if (match) {
+              numericValue = parseFloat(match[0]);
+            }
+          } else if (typeof vital.value === 'number') {
+            numericValue = vital.value;
+          }
+          
+          return {
+            name: `Record ${index + 1}`,
+            value: numericValue !== null && !isNaN(numericValue) ? numericValue : 0,
+            date: vital.date,
+            rawValue: vital.value
+          };
+        });
+      
+      console.log('Initial chart data for', selectedVitalForGraph, ':', selectedVitalData);
+      setChartData(selectedVitalData);
+    }
+  }, [vitalsData, selectedVitalForGraph]);
 
   const formatDate = (daysAgo: number) => {
     const date = new Date();
@@ -344,8 +372,8 @@ const VitalsView = () => {
   };
 
   return (
-    <div className="flex-1 flex gap-3 overflow-auto">
-      <div className="w-1/2 flex flex-col border rounded-md bg-card shadow">
+    <div className="flex flex-col md:flex-row gap-3 w-full h-full">
+      <div className="flex-1 min-w-0 flex flex-col border rounded-md bg-card shadow">
         <div className="flex items-center justify-between p-2 border-b bg-card text-foreground rounded-t-md">
           <h2 className="text-base font-semibold">{isVitalsEntryMode ? "Vitals Entry" : "Vitals"}</h2>
           <div className="flex items-center space-x-2">
@@ -357,7 +385,7 @@ const VitalsView = () => {
 
         {isVitalsEntryMode ? (
           <>
-            <ScrollArea className="flex-1 min-h-0">
+            <ScrollArea className="flex-1 min-h-0 flex flex-col">
               <Table className="text-xs">
                 <TableHeader className="sticky top-0 z-0">
                   <VitalsTableRow className="bg-blue-900">
@@ -613,26 +641,7 @@ const VitalsView = () => {
                         <SelectItem value="custom" className="text-xs">Custom Range</SelectItem>
                       </SelectContent>
                     </Select>
-                    
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground whitespace-nowrap w-20 text-right">
-                        {formatDate(dateRange[1])}
-                      </span>
-                      <Slider
-                        value={dateRange}
-                        onValueChange={handleDateRangeChange}
-                        min={0}
-                        max={30}
-                        step={1}
-                        minStepsBetweenThumbs={1}
-                        className="w-32"
-                      />
-                      <span className="text-xs text-muted-foreground whitespace-nowrap w-20">
-                        {formatDate(dateRange[0])}
-                      </span>
-                    </div>
                   </div>
-                  
                   <div className="flex items-center gap-2">
                     <Label htmlFor="showEntries" className="text-xs whitespace-nowrap">Show</Label>
                     <Select value={showEntries} onValueChange={setShowEntries}>
@@ -728,11 +737,11 @@ const VitalsView = () => {
             </>
           )}
         </div>
-        <div className="basis-1/2 flex flex-col border rounded-md bg-card shadow min-h-0">
+        <div className="flex-1 min-w-0 flex flex-col border rounded-md bg-card shadow">
           <div className="flex items-center p-2 border-b bg-card text-foreground rounded-t-md">
             <h2 className="text-base font-semibold">{selectedVitalForGraph} Graph</h2>
           </div>
-        <div className="flex-1 p-2 flex flex-col">
+          <div className="flex-1 min-w-0 flex flex-col">
           {loading ? (
             <div className="flex-1 flex items-center justify-center">
               <p className="text-muted-foreground">Loading chart data...</p>
@@ -1139,7 +1148,7 @@ const IntakeOutputView = () => {
   };
 
   return (
-    <div className="flex-1 w-[95%] flex justify-between gap-3 overflow-auto">
+    <div className="flex-1 w-[90%] flex justify-between gap-3 overflow-auto">
       <div className="basis-1/2 flex flex-col border rounded-md bg-card shadow overflow-hidden">
         {currentView === 'summary' ? (
           <>
