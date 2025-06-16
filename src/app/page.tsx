@@ -32,6 +32,8 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import usePatientProblems from '@/hooks/usePatientProblems';
 import { usePatientAllergies } from '@/hooks/usePatientAllergies';
 import { useClinicalNotes, type ClinicalNote } from '@/hooks/useClinicalNotes';
+import { saveProblem, type ApiProbSavePayload } from '@/services/problem';
+import { saveAllergy, type ApiAllergySavePayload } from '@/services/allergy';
 
 // Chart configurations
 const glucoseChartConfig: ChartConfig = { level: { label: 'Glucose (mg/dL)', color: 'hsl(var(--chart-2))' } };
@@ -436,54 +438,48 @@ export default function DashboardPage({
   // Handle adding new entries
   const handleAddProblem = async (dialogId: string) => {
     const input = problemInputs[dialogId];
-    if (!input?.input.trim()) {
-      toast.error('Problem description is required.');
+    if (!input?.input?.trim()) {
+      toast.error('Please enter a problem description.');
       return;
     }
-    if (!input.status) {
-      toast.error('Status is required.');
-      return;
-    }
-    if (!input.immediacy) {
-      toast.error('Immediacy is required.');
-      return;
-    }
-  
-    // Build the API request body
-    const body = {
+
+    const toastId = toast.loading('Saving problem...');
+
+    const formatDate = (dateString: string | undefined) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return ''; // Invalid date
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+
+    const payload: ApiProbSavePayload = {
       UserName: "CPRS-UAT",
       Password: "UAT@123",
-      PatientSSN: patient?.ssn || "",
-      DUZ: "20407",                    // Replace with dynamic value if you have it
-      ihtLocation: "87",               // Replace with dynamic value if you have it
-      cdpProbL: input.input,
-      cpClinic: "",                    // No field in your state, so send empty string
-      cdpDOSet: input.dateOnset,       // Use the correct field name
-      cdpStts: input.status,
-      cdpServ: input.service || "",
-      cdpImmed: input.immediacy,
-      cdpCMT: input.comment || "",
-      cpWard: "",                      // No field in your state, so send empty string
-      DUZIP: ""                        // No field in your state, so send empty string
+      PatientSSN: "210099218", // TODO: Replace with dynamic patient SSN from context
+      DUZ: "20407",
+      ihtLocation: "87",
+      cdpProbL: input.input || '',
+      cpClinic: "", // Not available in the form
+      cdpDOSet: formatDate(input.dateOnset) || '',
+      cdpStts: input.status || '',
+      cdpServ: "23", // TODO: Map service name to ID. Using hardcoded value for now.
+      cdpImmed: input.immediacy || '',
+      cdpCMT: input.comment || '',
+      cpWard: "", // Not available in the form
+      DUZIP: "" // Not available in the form
     };
-  
+
     try {
-      const res = await fetch("http://3.6.230.54:4003/api/apiProbSave.sh", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-      const result = await res.json();
-  
-      if (result && result.success) {
-        toast.success('Problem added successfully!');
-        closeFloatingDialog(dialogId);
-        // Optionally: refresh problems list here
-      } else {
-        toast.error(result?.message || 'Failed to add problem.');
-      }
-    } catch (err) {
-      toast.error('Failed to add problem. Please try again.');
+      const result = await saveProblem(payload);
+      toast.success('Problem saved successfully!', { id: toastId });
+      closeFloatingDialog(dialogId);
+      // Optionally, refresh the problems list here
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      toast.error(`Failed to save problem: ${errorMessage}`, { id: toastId });
     }
   };
 
@@ -506,27 +502,73 @@ export default function DashboardPage({
     closeFloatingDialog(dialogId);
   };
 
-  const handleAddAllergy = (dialogId: string) => {
+  const handleAddAllergy = async (dialogId: string) => {
+    console.log('handleAddAllergy called with dialogId:', dialogId);
     const input = allergyInputs[dialogId];
-    if (!input?.allergen.trim() || !input.severity || !input.status) {
-      toast.error('Please fill all required fields: Allergen, Severity, and Status.');
+    console.log('Current input:', input);
+    
+    if (!input?.allergen?.trim()) {
+      console.log('Validation failed: Missing allergen');
+      toast.error('Please enter an allergen.');
+      return;
+    }
+    if (!input.severity) {
+      console.log('Validation failed: Missing severity');
+      toast.error('Please select a severity.');
+      return;
+    }
+    if (!input.status) {
+      console.log('Validation failed: Missing status');
+      toast.error('Please select a status.');
       return;
     }
 
-    const newAllergy: Allergy = {
-      id: Date.now().toString(),
-      allergen: input.allergen,
-      reaction: input.reaction || 'Not specified',
-      severity: input.severity as 'Mild' | 'Moderate' | 'Severe',
-      dateOnset: input.dateOnset || '',
-      treatment: input.treatment || '',
-      status: input.status as 'Active' | 'Inactive',
-      notes: input.notes || '',
-      createdBy: 'Dr. User',
-      createdAt: new Date().toISOString(),
+    console.log('All validations passed, preparing payload...');
+    const toastId = toast.loading('Saving allergy...');
+
+    const formatDate = (dateString: string | undefined) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return ''; // Invalid date
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
     };
-    toast.success('Allergy added successfully!');
-    closeFloatingDialog(dialogId);
+
+    const now = new Date();
+    const formattedDate = now.toISOString().replace('T', ' ').substring(0, 19);
+
+    const payload: ApiAllergySavePayload = {
+      UserName: "CPRS-UAT",
+      Password: "UAT@123",
+      PatientSSN: "210099218", // TODO: Replace with dynamic patient SSN from context
+      DUZ: "20407",
+      ihtLocation: "87",
+      cdaAllrgyS: input.allergen || '',
+      cdaNatRea: input.reaction || '',
+      cdaObsHis: input.notes || '',
+      cdaSrty: input.severity || '',
+      cdaReDat: formatDate(input.dateOnset) || '',
+      cdaSignSymL: input.reaction || '',
+      cdaDatTm: formattedDate,
+      cdaCMT: input.notes || '',
+      cdaNotKnow: "false"
+    };
+
+    console.log('Sending payload to API:', payload);
+
+    try {
+      console.log('Calling saveAllergy service...');
+      const result = await saveAllergy(payload);
+      console.log('API Response:', result);
+      toast.success('Allergy saved successfully!', { id: toastId });
+      closeFloatingDialog(dialogId);
+    } catch (error) {
+      console.error('Error in handleAddAllergy:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      toast.error(`Failed to save allergy: ${errorMessage}`, { id: toastId });
+    }
   };
 
   const handleSaveNewInfoItem = (dialogId: string) => {
@@ -1141,7 +1183,7 @@ export default function DashboardPage({
                   </div>
                 </div>
                 <div className="flex gap-3">
-                  <Label className="w-[120px] min-w-[120px] mt-1">Preferred Problems</Label>
+                  <Label className="w-[120px] min-w-[120px]">Preferred Problems</Label>
                   <div className="grid grid-cols-2 gap-2 flex-1 max-h-40 overflow-y-auto">
                     {[
                       'Anemia (D64.9)', 'Diabetes (E11.9)', 'Dehydration (E86.0)', 'Confusion (F29.)', 'Depression (F32.9)',
