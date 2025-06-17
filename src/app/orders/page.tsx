@@ -35,7 +35,7 @@ import { cn } from '@/lib/utils';
 import IpMedicationOrderDialog from './IpMedicationOrderDialog';
 import type { Patient } from '@/lib/constants';
 import type { NextPage } from 'next';
-import { api } from '@/services/api'; // Import api
+import { apiService } from '@/services/api'; // Import api
 
 
 // Add OrdersPageProps interface
@@ -1818,7 +1818,7 @@ const OrdersPage: NextPage<OrdersPageProps> = ({ patient: initialPatient }) => {
           console.log('Fetching default patient data with default SSN...');
           // Fetch default patient using the default SSN
           const defaultSSN = "670768354";
-          const data = await api.getPatients(defaultSSN) as ApiPatientResponse[];
+          const data = await apiService.getPatients(defaultSSN) as ApiPatientResponse[];
           console.log('Default Patient API response:', data);
 
           if (data && data.length > 0) {

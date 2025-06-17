@@ -1163,23 +1163,25 @@ export default function DashboardPage({
             {dialog.type === 'problem' && (
               <div className="flex flex-col gap-3 text-sm">
                 <div className="flex items-center gap-3">
-                  <Label htmlFor={`problemCategory-${dialog.id}`} className="w-[120px] min-w-[120px]">Categories</Label>
-                  <Select
-                    value={problemInputs[dialog.id]?.category}
-                    onValueChange={(value) => setProblemInputs((prev) => ({
-                      ...prev,
-                      [dialog.id]: { ...prev[dialog.id], category: value as ProblemCategory },
-                    }))}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Select Category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Common Problems">Common Problems</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <div className="flex items-center space-x-1">
+                  <Label htmlFor={`problemCategory-${dialog.id}`} className="w-[120px] min-w-[120px] shrink-0">Categories</Label>
+                  <div className="flex-1 min-w-0">
+                    <Select
+                      value={problemInputs[dialog.id]?.category}
+                      onValueChange={(value) => setProblemInputs((prev) => ({
+                        ...prev,
+                        [dialog.id]: { ...prev[dialog.id], category: value as ProblemCategory },
+                      }))}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select Category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Common Problems">Common Problems</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center space-x-2 ml-2">
                     <Checkbox
                       id={`otherProblems-${dialog.id}`}
                       checked={problemInputs[dialog.id]?.other}
@@ -1187,37 +1189,60 @@ export default function DashboardPage({
                         ...prev,
                         [dialog.id]: { ...prev[dialog.id], other: checked as boolean },
                       }))}
+                      className="h-4 w-4"
                     />
-                    <Label htmlFor={`otherProblems-${dialog.id}`}>Other Problems</Label>
+                    <Label htmlFor={`otherProblems-${dialog.id}`} className="text-sm whitespace-nowrap">
+                      Other Problems
+                    </Label>
                   </div>
                 </div>
-                <div className="flex gap-3">
-                  <Label className="w-[120px] min-w-[120px]">Preferred Problems</Label>
-                  <div className="grid grid-cols-2 gap-2 flex-1 max-h-40 overflow-y-auto">
-                    {[
-                      'Anemia (D64.9)', 'Diabetes (E11.9)', 'Dehydration (E86.0)', 'Confusion (F29.)', 'Depression (F32.9)',
-                      'Double vision (H53.2)', 'Blurred Vision (H53.8)', 'Defective Vision (H54.7)', 'Eye Pain (H57.13)',
-                      'Ear Pain (H60.9)', 'Fever (R50.9)',
-                    ].map((problem, index) => (
-                      <div key={index} className="flex items-center space-x-2 text-sm">
-                        <Checkbox
-                          id={`preferred-${dialog.id}-${index}`}
-                          checked={problemInputs[dialog.id]?.preferred.includes(problem)}
-                          onCheckedChange={(checked) => setProblemInputs((prev) => ({
-                            ...prev,
-                            [dialog.id]: {
-                              ...prev[dialog.id],
-                              preferred: checked
-                                ? [...prev[dialog.id].preferred, problem]
-                                : prev[dialog.id].preferred.filter((p) => p !== problem),
-                            },
-                          }))}
-                        />
-                        <Label htmlFor={`preferred-${dialog.id}-${index}`}>{problem}</Label>
-                      </div>
-                    ))}
+
+                {/* Other Problems Input - Only shown when checked */}
+                {problemInputs[dialog.id]?.other ? (
+                  <div className="flex items-center gap-3 mt-2">
+                    <Label htmlFor={`otherProblemInput-${dialog.id}`} className="w-[120px] min-w-[120px] shrink-0">
+                      Problem Description
+                    </Label>
+                    <Input
+                      id={`otherProblemInput-${dialog.id}`}
+                      value={problemInputs[dialog.id]?.input || ''}
+                      onChange={(e) => setProblemInputs((prev) => ({
+                        ...prev,
+                        [dialog.id]: { ...prev[dialog.id], input: e.target.value },
+                      }))}
+                      placeholder="Enter problem description"
+                      className="flex-1"
+                    />
                   </div>
-                </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <Label className="w-[120px] min-w-[120px]">Preferred Problems</Label>
+                    <div className="grid grid-cols-2 gap-2 flex-1 max-h-40 overflow-y-auto">
+                      {[
+                        'Anemia (D64.9)', 'Diabetes (E11.9)', 'Dehydration (E86.0)', 'Confusion (F29.)', 'Depression (F32.9)',
+                        'Double vision (H53.2)', 'Blurred Vision (H53.8)', 'Defective Vision (H54.7)', 'Eye Pain (H57.13)',
+                        'Ear Pain (H60.9)', 'Fever (R50.9)',
+                      ].map((problem, index) => (
+                        <div key={index} className="flex items-center space-x-2 text-sm">
+                          <Checkbox
+                            id={`preferred-${dialog.id}-${index}`}
+                            checked={problemInputs[dialog.id]?.preferred.includes(problem)}
+                            onCheckedChange={(checked) => setProblemInputs((prev) => ({
+                              ...prev,
+                              [dialog.id]: {
+                                ...prev[dialog.id],
+                                preferred: checked
+                                  ? [...prev[dialog.id].preferred, problem]
+                                  : prev[dialog.id].preferred.filter((p) => p !== problem),
+                              },
+                            }))}
+                          />
+                          <Label htmlFor={`preferred-${dialog.id}-${index}`}>{problem}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center gap-3">
                   <div className="w-1/2 flex items-center gap-3">
                     <Label htmlFor={`problemStatus-${dialog.id}`} className="w-[120px] min-w-[120px]">Status</Label>

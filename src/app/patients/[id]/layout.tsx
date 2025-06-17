@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { api } from '@/services/api';
+import { apiService } from '@/services/api';
 import { Patient } from '@/lib/constants';
 import { PatientProvider } from '@/hooks/use-patient';
 // import SidebarNav from '@/components/layout/sidebar-nav';
@@ -42,7 +42,7 @@ export default function PatientLayout({
         const fetchPatient = async () => {
             try {
                 setLoading(true);
-                const data = await api.getPatients();
+                const data = await apiService.getPatients();
                 if (Array.isArray(data)) {
                     const found = (data as ApiPatient[]).find((p) => String(p.DFN) === String(id));
                     if (found) {

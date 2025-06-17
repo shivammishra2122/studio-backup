@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, usePathname } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
-import { api, Patient } from "@/services/api";
+import { apiService, Patient } from "@/services/api";
 import { 
   User, 
   Phone, 
@@ -29,7 +28,6 @@ const navItems: { name: string; icon: any; href: string }[] = [];
 
 export default function SidebarNav() {
   const { id } = useParams();
-  const pathname = usePathname();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(false);
   const [isPatientDetailsOpen, setIsPatientDetailsOpen] = useState(false);
@@ -42,7 +40,7 @@ export default function SidebarNav() {
       
       setLoading(true);
       try {
-        const data = await api.getPatients();
+        const data = await apiService.getPatients();
         if (Array.isArray(data)) {
           const found = (data as any[]).find((p: any) => String(p.DFN) === String(id));
           if (found) {

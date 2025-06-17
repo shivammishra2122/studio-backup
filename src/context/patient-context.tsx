@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Patient } from '@/services/api';
-import { api } from '@/services/api';
+import { apiService } from '@/services/api';
 
 const { createContext, useContext, useState, useCallback } = React;
 type ReactNode = React.ReactNode;
@@ -33,7 +33,7 @@ export const PatientProvider = ({ children }: { children: ReactNode }) => {
       const queryString = searchParams ? new URLSearchParams(searchParams).toString() : '';
       
       // Cast the response to Patient[] since we know the shape of our API response
-      const data = await api.getPatients(queryString) as unknown as Patient[];
+      const data = await apiService.getPatients(queryString) as unknown as Patient[];
       setPatients(Array.isArray(data) ? data : []);
     } catch (err) {
       setError('Failed to fetch patients. Please try again.');
