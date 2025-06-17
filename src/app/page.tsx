@@ -110,13 +110,38 @@ export default function DashboardPage({
   allergies: Allergy[];
   vitals: any; // Replace with your vitals type if available
 }): JSX.Element {
+  // State for allergy dialog
+  const [showAllergyDialog, setShowAllergyDialog] = useState(false);
+  
+  // State for problem inputs
+  const [problemInputs, setProblemInputs] = useState<Record<string, {
+    input: string;
+    category: ProblemCategory | '';
+    other: boolean;
+    preferred: string[];
+    status: ProblemStatus | '';
+    immediacy: ProblemImmediacy | '';
+    dateOnset: string;
+    service: string;
+    comment: string;
+  }>>({});
+
   // Fetch up-to-date problems for the patient (fallback to provided problems until fetch completes)
   const effectiveSSN = patient.ssn && patient.ssn.trim() !== '' ? patient.ssn : '670230065';
   const { problems: fetchedProblems } = usePatientProblems(effectiveSSN);
   const { allergies: fetchedAllergies, loading: allergiesLoading } = usePatientAllergies(effectiveSSN);
   const { notes: clinicalNotes, loading: clinicalNotesLoading } = useClinicalNotes(effectiveSSN);
   
-  const problemsToShow = fetchedProblems.length ? fetchedProblems : problems;
+  // Map the API Problem type to our local Problem type
+  const problemsToShow = fetchedProblems.length 
+    ? fetchedProblems.map(p => ({
+        id: p.id,
+        description: p.problem,
+        dateOnset: p.dateOfOnset,
+        status: p.status as ProblemStatus,
+        immediacy: p.immediacy as ProblemImmediacy
+      }))
+    : problems;
   const allergiesToShow = Object.values(fetchedAllergies).length > 0 ? Object.values(fetchedAllergies) : allergies;
 
   // State management
@@ -140,23 +165,10 @@ export default function DashboardPage({
   const [quickOrder, setQuickOrder] = useState<string>('');
   const [dropdownOpen, setDropdownOpen] = useState<boolean>(false);
   const [filteredMeds, setFilteredMeds] = useState<string[]>([]);
-  const [showAllergyDialog, setShowAllergyDialog] = useState(false);
+  const [isAllergyDialogVisible, setIsAllergyDialogVisible] = useState<boolean>(false);
   const [selectedAllergy, setSelectedAllergy] = useState<Allergy | null>(null);
 
   // Dialog input states
-  const [problemInputs, setProblemInputs] = useState<
-    Record<string, {
-      input: string;
-      category: ProblemCategory | '';
-      other: boolean;
-      preferred: string[];
-      status: ProblemStatus | '';
-      immediacy: ProblemImmediacy | '';
-      dateOnset: string;
-      service: ProblemService | '';
-      comment: string;
-    }>
-  >({});
   const [medicationInputs, setMedicationInputs] = useState<
     Record<string, { name: string; reason: string; amount: string; timing: string }>
   >({});
@@ -471,16 +483,14 @@ export default function DashboardPage({
       id: `problem-${Date.now()}`,
       description: input.input,
       category: input.category || 'Other',
-      status: input.status || 'Active',
+      status: (input.status || 'ACTIVE') as ProblemStatus,
       dateOnset: input.dateOnset || new Date().toISOString(),
       service: input.service as ProblemService,
-      comment: input.comment || '',
-      createdBy: 'Current User',
-      createdAt: new Date().toISOString(),
+      notes: input.comment
     };
 
-    // Add the new problem to local state
-    setProblems(prev => [...prev, newProblem]);
+    // Add the new problem to local state with proper type
+    console.log('New problem to be added:', newProblem);
     
     // Reset the form
     setProblemInputs(prev => ({
@@ -492,12 +502,12 @@ export default function DashboardPage({
         preferred: [],
         status: '',
         immediacy: '',
-        dateOnset: new Date().toISOString().split('T')[0],
+        dateOnset: '',
         service: '',
         comment: ''
       }
     }));
-
+    
     // Close the dialog
     closeFloatingDialog(dialogId);
     
@@ -615,10 +625,10 @@ export default function DashboardPage({
                       <div
                         className="font-medium text-xs cursor-pointer"
                         onClick={() => {
-                          setSelectedProblem();
+                          setSelectedProblem(problem);
                           setShowProblemDialog(true);
                         }}
-                      >{('description' in problem ? (problem as any).description : (problem as any).problem)}</div>
+                      >{('description' in problem ? problem.description : (problem as any).problem)}</div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1299,9 +1309,10 @@ export default function DashboardPage({
                   <Button onClick={() => handleAddProblem(dialog.id)}>Create</Button>
                   <Button
                     variant="secondary"
-                    onClick={() => setProblemInputs((prev) => ({
+                    onClick={() => setProblemInputs(prev => ({
                       ...prev,
                       [dialog.id]: {
+                        input: '',
                         category: '',
                         other: false,
                         preferred: [],
@@ -1309,8 +1320,8 @@ export default function DashboardPage({
                         immediacy: '',
                         dateOnset: '',
                         service: '',
-                        comment: '',
-                      },
+                        comment: ''
+                      }
                     }))}
                   >
                     Reset

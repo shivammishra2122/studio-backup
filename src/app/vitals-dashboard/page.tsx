@@ -50,6 +50,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
+import { Problem } from '@/hooks/usePatientProblems';
 
 // Custom TableRow without hover effect for vitals entry
 const VitalsTableRow = React.forwardRef<
@@ -156,6 +157,7 @@ const VitalsView = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showEntries, setShowEntries] = useState<string>("10");
+  const [dateRange, setDateRange] = useState<[number, number]>([0, 7]);
 
   const yAxisConfig = getYAxisConfig(selectedVitalForGraph);
 
