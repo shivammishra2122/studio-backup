@@ -376,11 +376,11 @@ const VitalsView = () => {
   return (
     <div className="flex flex-col md:flex-row gap-3 w-full h-full">
       <div className="flex-1 min-w-0 flex flex-col border rounded-md bg-card shadow">
-        <div className="flex items-center justify-between p-2 border-b bg-card text-foreground rounded-t-md">
-          <h2 className="text-base font-semibold">{isVitalsEntryMode ? "Vitals Entry" : "Vitals"}</h2>
-          <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-muted/50" onClick={() => setIsVitalsEntryMode(!isVitalsEntryMode)}>
-              <Edit3 className="h-4 w-4" />
+        <div className="flex items-center justify-between py-1.5 px-3 border-b bg-card text-foreground rounded-t-md">
+          <h2 className="text-sm font-medium">{isVitalsEntryMode ? "Vitals Entry" : "Vitals"}</h2>
+          <div className="flex items-center space-x-1">
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-primary hover:bg-muted/50" onClick={() => setIsVitalsEntryMode(!isVitalsEntryMode)}>
+              <Edit3 className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
@@ -620,7 +620,7 @@ const VitalsView = () => {
           </>
         ) : (
           <>
-            <div className="flex-1 flex flex-col overflow-hidden p-0">
+            <div className="flex-1 flex flex-col overflow-auto p-3 no-scrollbar">
               <div className="mb-2 text-xs">
                 <div className="flex flex-nowrap items-center justify-between w-full gap-3">
                   <div className="flex items-center gap-3">
@@ -660,10 +660,6 @@ const VitalsView = () => {
                   </div>
                 </div>
               </div>
-
-              {/* Vitals Chart */}
-              {/* Vitals Chart */}
-
 
               {/* Vitals Table */}
               <div className="flex-1 flex flex-col overflow-hidden">

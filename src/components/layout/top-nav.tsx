@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { LogoutButton } from '@/components/auth/logout-button';
 
 const navButtonLabels = [
   "Cover Sheet", "Dashboard", "Orders", "Clinical Notes", "Discharge Summary",
@@ -170,10 +171,9 @@ export function TopNav() {
             SIGNATURE BLOCK
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="py-2 px-3 text-xs text-red-600 hover:!text-red-600 hover:!bg-red-50 focus:!text-red-600 focus:!bg-red-50">
-            <LogOut className="h-4 w-4 mr-2.5" />
-            LOG OUT
-          </DropdownMenuItem>
+          <div className="p-1">
+            <LogoutButton className="w-full justify-start h-8 text-xs" variant="ghost" />
+          </div>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

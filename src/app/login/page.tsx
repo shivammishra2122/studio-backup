@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import * as React from "react";
 import { useRouter } from 'next/navigation';
@@ -162,7 +162,6 @@ export default function LoginPage() {
         <Card className="w-full max-w-md p-6 shadow-lg">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold">Login </CardTitle>
-            
           </CardHeader>
           <CardContent className="space-y-4">
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -187,6 +186,7 @@ export default function LoginPage() {
                     <Input 
                       id="verificationCode" 
                       placeholder="Enter your verification code" 
+                      type="password"
                       {...form.register("verificationCode")}
                     />
                     {form.formState.errors.verificationCode && (
