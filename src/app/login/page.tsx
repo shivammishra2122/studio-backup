@@ -90,7 +90,12 @@ export default function LoginPage() {
 
   // Redirect if already authenticated
   React.useEffect(() => {
-    if (Cookies.get('isAuthenticated') === 'true') {
+    // Only redirect if we're not already on the login page
+    // This prevents the flash of login page before redirect
+    const isAuthenticated = typeof window !== 'undefined' && 
+      document.cookie.split(';').some((item) => item.trim().startsWith('isAuthenticated='));
+    
+    if (isAuthenticated) {
       router.replace('/patients');
     }
   }, [router]);
@@ -108,15 +113,16 @@ export default function LoginPage() {
 
       if (result.succeeded === true) {
         // Store user data in session/local storage if needed
-        Cookies.set('isAuthenticated', 'true');
-        Cookies.set('userName', result.DUZName || '');
+        document.cookie = 'isAuthenticated=true; path=/';
+        localStorage.setItem('user', JSON.stringify({ username: result.DUZName || '' }));
         
         toast({
           title: "Login Successful",
           description: `Welcome, ${result.DUZName || 'User'}!`,
         });
         
-        router.push("/patients");
+        // Use window.location to force a full page reload and clear any state
+        window.location.href = '/patients';
       } else {
         throw new Error(result.errors || 'Login failed. Please check your credentials.');
       }

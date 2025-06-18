@@ -65,8 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const mockUser = { username };
       setUser(mockUser);
       localStorage.setItem('user', JSON.stringify(mockUser));
+      document.cookie = 'isAuthenticated=true; path=/;';
       
-      router.push('/');
+      router.push('/patients');
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
@@ -81,8 +82,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Clear user data
       setUser(null);
       localStorage.removeItem('user');
+      // Clear the authentication cookie
+      document.cookie = 'isAuthenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       
-      router.push('/login');
+      // Force a full page reload to clear any state
+      window.location.href = '/login';
     } catch (error) {
       console.error('Logout failed:', error);
       throw error;
