@@ -30,10 +30,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Check if user session exists in localStorage
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
-          setUser(JSON.parse(storedUser));
+          const parsedUser = JSON.parse(storedUser);
+          // Only update state if user is different to prevent unnecessary re-renders
+          setUser(prevUser => JSON.stringify(prevUser) === storedUser ? prevUser : parsedUser);
+        } else {
+          setUser(null);
         }
       } catch (error) {
         console.error('Error checking auth status:', error);
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -43,7 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Set up beforeunload event listener
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (user) {
+      const currentUser = localStorage.getItem('user');
+      if (currentUser) {
         e.preventDefault();
         e.returnValue = 'Please logout before closing the browser';
         return 'Please logout before closing the browser';
@@ -54,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [user]);
+  }, []); // Removed user from dependencies to prevent infinite loop
 
   const login = async (username: string, password: string) => {
     try {

@@ -44,16 +44,16 @@ export default function RootLayout({
         antialiased 
         flex 
         flex-col 
-        h-screen 
+        min-h-screen 
+        w-full
         bg-background 
-        text-foreground 
-        overflow-hidden
+        text-foreground
       `}>
         <AuthProvider>
           <ClientProviders>
             <ClientOnly>
-              <div className="flex-1 flex flex-col overflow-hidden">
-                <main className="flex-1 overflow-y-auto">
+              <div className="flex flex-col w-full min-h-0 flex-1">
+                <main className="flex-1 w-full overflow-visible">
                   {children}
                 </main>
               </div>

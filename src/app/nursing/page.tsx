@@ -1,10 +1,8 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { fetchProcedureOrders, type ProcedureOrder } from '@/services/procedure';
 import { Loader2, AlertCircle, ExternalLink, Calendar, MapPin, User, ClipboardList } from 'lucide-react';
 
@@ -20,8 +18,14 @@ const nurseOrderOptions = [
 const NursingPage = () => {
   const [activeSubNav, setActiveSubNav] = useState<string>(nursingSubNavItems[0]);
   const [procedureOrders, setProcedureOrders] = useState<ProcedureOrder[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Nurse Order button click handler
+  const handleNurseOrderClick = (option: string) => {
+    console.log(`Selected: ${option}`);
+    // Add your navigation or action logic here
+  };
 
   useEffect(() => {
     if (activeSubNav === 'Nurse Order') {
@@ -82,16 +86,18 @@ const NursingPage = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-var(--top-nav-height,60px))] bg-background text-sm px-3 pb-3 pt-0">
-      {/* Horizontal Navigation Bar */}
+    <div className="flex flex-col h-[calc(100vh-var(--top-nav-height,60px))] bg-background text-sm p-2">
+      {/* Navigation Tabs */}
       <div className="flex items-end space-x-1 px-1 pb-0 overflow-x-auto no-scrollbar">
         {nursingSubNavItems.map((item) => (
           <Button
             key={item}
+            variant={activeSubNav === item ? "default" : "ghost"}
+            size="sm"
             onClick={() => setActiveSubNav(item)}
             className={`text-xs px-3 py-1.5 h-auto rounded-b-none rounded-t-md whitespace-nowrap focus-visible:ring-0 focus-visible:ring-offset-0
               ${activeSubNav === item
-                ? 'bg-background text-primary border-x border-t border-border border-b-2 border-b-background shadow-sm relative -mb-px z-10 hover:bg-background hover:text-primary' 
+                ? 'bg-background text-primary border-x border-t border-border border-b-2 border-b-background shadow-sm relative -mb-px z-10 hover:bg-background hover:text-primary'
                 : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground border-x border-t border-transparent'
               }`}
           >
@@ -100,155 +106,279 @@ const NursingPage = () => {
         ))}
       </div>
 
-      {/* Right Content Panel */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {activeSubNav === "Nurse Order" && (
-          <div className="flex-1 flex flex-col bg-white rounded-lg shadow-sm border overflow-hidden">
-            <div className="bg-[#f8f9fa] px-6 py-3 border-b flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Procedure Orders</h2>
-              <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm" className="h-8 text-xs">
-                  <ClipboardList className="h-4 w-4 mr-1.5" />
-                  New Order
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col gap-3 overflow-hidden">
+        {activeSubNav === 'Nurse Order' && (
+          <Card className="flex-1 flex flex-col shadow-sm">
+            <CardHeader className="px-4 py-2 border-b">
+              <CardTitle className="text-base font-medium">Nurse Order</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col p-4 gap-3">
+              {nurseOrderOptions.map((option) => (
+                <Button
+                  key={option}
+                  variant="outline"
+                  className="justify-start h-14 text-left text-sm px-4 py-3 rounded-lg border-gray-200 hover:bg-gray-50"
+                  onClick={() => handleNurseOrderClick(option)}
+                >
+                  {option}
                 </Button>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {activeSubNav === 'Nurse Chart List' && (
+          <Card className="flex-1 flex flex-col shadow-sm">
+            <CardHeader className="px-4 py-3 border-b">
+              <CardTitle className="text-base font-medium">Nurse Chart List</CardTitle>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mt-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <span>Show</span>
+                  <select className="border rounded px-2 py-1 text-sm">
+                    <option>10</option>
+                    <option>25</option>
+                    <option>50</option>
+                    <option>100</option>
+                  </select>
+                  <span>entries</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                  <div className="relative">
+                    <select className="border rounded px-3 py-1.5 text-sm pr-8 w-full sm:w-48">
+                      <option value="">Speciality</option>
+                      <option>Cardiology</option>
+                      <option>Neurology</option>
+                      <option>Pediatrics</option>
+                    </select>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search..."
+                      className="border rounded px-3 py-1.5 text-sm w-full sm:w-48"
+                    />
+                    <svg
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  </div>
+                </div>
               </div>
-            </div>
-            
-            <div className="flex-1 overflow-auto">
-              {loading ? (
-                <div className="flex items-center justify-center p-12">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
-                  <span className="text-sm text-muted-foreground">Loading procedure orders...</span>
-                </div>
-              ) : error ? (
-                <div className="flex items-center justify-center p-12 text-destructive">
-                  <AlertCircle className="h-5 w-5 mr-2" />
-                  <span>{error}</span>
-                </div>
-              ) : (
-                <div className="min-w-full">
-                  <Table>
-                    <TableHeader className="bg-gray-50">
-                      <TableRow>
-                        <TableHead className="w-[120px] text-xs font-medium text-gray-500 uppercase tracking-wider">Order</TableHead>
-                        <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Details</TableHead>
-                        <TableHead className="w-[120px] text-xs font-medium text-gray-500 uppercase tracking-wider text-center">Status</TableHead>
-                        <TableHead className="w-[120px] text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody className="divide-y divide-gray-200">
-                      {procedureOrders.length > 0 ? (
-                        procedureOrders.map((order) => (
-                          <TableRow key={order.id} className="hover:bg-gray-50">
-                            <TableCell className="py-3">
-                              <div className="text-sm font-medium text-gray-900">#{order.orderId}</div>
-                              <div className="text-xs text-gray-500">{order.service}</div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm font-medium text-gray-900">{order.order}</div>
-                              <div className="mt-1 flex flex-col space-y-1 text-xs text-gray-500">
-                                <div className="flex items-center">
-                                  <User className="h-3.5 w-3.5 mr-1.5 text-gray-400" />
-                                  <span>{order.provider}</span>
-                                </div>
-                                <div className="flex items-center">
-                                  <MapPin className="h-3.5 w-3.5 mr-1.5 text-gray-400" />
-                                  <span>{order.location}</span>
-                                </div>
-                                <div className="flex items-center">
-                                  <Calendar className="h-3.5 w-3.5 mr-1.5 text-gray-400" />
-                                  <span>{order.startDate}</span>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              {getStatusBadge(order.status)}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex justify-center space-x-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-8 w-8 p-0 text-gray-500 hover:text-primary"
-                                  title="View Order"
-                                  asChild
-                                >
-                                  <a href={order.viewUrl} target="_blank" rel="noopener noreferrer">
-                                    <ExternalLink className="h-4 w-4" />
-                                  </a>
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={4} className="px-6 py-8 text-center">
-                            <div className="flex flex-col items-center justify-center text-gray-500">
-                              <ClipboardList className="h-8 w-8 mb-2 text-gray-400" />
-                              <p className="text-sm font-medium">No procedure orders found</p>
-                              <p className="text-xs mt-1">Create a new order to get started</p>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
-            
-            {procedureOrders.length > 0 && (
-              <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-                <div className="flex-1 flex justify-between sm:hidden">
-                  <Button variant="outline" size="sm" className="relative">
-                    Previous
-                  </Button>
-                  <Button variant="outline" size="sm" className="ml-3">
-                    Next
-                  </Button>
-                </div>
+            </CardHeader>
+            <CardContent className="flex-1 p-0 overflow-auto">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        S No.
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Date Entered
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Speciality
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Location
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Entered By
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {[1, 2, 3, 4, 5].map((item, index) => (
+                      <tr key={item} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {index + 1}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          05/07/2023 10:30 AM
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          Cardiology
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          Main Hospital
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          Dr. Smith
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Pagination */}
+              <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
                 <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm text-gray-700">
-                      Showing <span className="font-medium">1</span> to <span className="font-medium">{procedureOrders.length}</span> of{' '}
-                      <span className="font-medium">{procedureOrders.length}</span> results
+                      Showing <span className="font-medium">1</span> to <span className="font-medium">5</span> of{' '}
+                      <span className="font-medium">25</span> results
                     </p>
                   </div>
-                  <div className="flex space-x-2">
-                    <Button variant="outline" size="sm" disabled={true}>
-                      Previous
-                    </Button>
-                    <Button variant="outline" size="sm" disabled={true}>
-                      Next
-                    </Button>
+                  <div>
+                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                      <a
+                        href="#"
+                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                      >
+                        <span className="sr-only">Previous</span>
+                        &larr;
+                      </a>
+                      <a
+                        href="#"
+                        aria-current="page"
+                        className="z-10 bg-blue-50 border-blue-500 text-blue-600 relative inline-flex items-center px-4 py-2 border text-sm font-medium"
+                      >
+                        1
+                      </a>
+                      <a
+                        href="#"
+                        className="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium"
+                      >
+                        2
+                      </a>
+                      <a
+                        href="#"
+                        className="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium"
+                      >
+                        3
+                      </a>
+                      <a
+                        href="#"
+                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                      >
+                        <span className="sr-only">Next</span>
+                        &rarr;
+                      </a>
+                    </nav>
                   </div>
                 </div>
               </div>
-            )}
+            </CardContent>
+          </Card>
+        )}
+
+        {activeSubNav === 'Pharmacy' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4">
+            {/* Indent Card */}
+            <Card className="shadow-sm">
+              <CardHeader className="bg-gray-50 px-4 py-3 border-b">
+                <CardTitle className="text-base font-medium">Indent</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-3">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start h-12 text-left text-sm px-4 py-3 rounded-lg border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                >
+                  Nursing Indent
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start h-12 text-left text-sm px-4 py-3 rounded-lg border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                >
+                  Change Medication Order
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Drug Request Card */}
+            <Card className="shadow-sm">
+              <CardHeader className="bg-gray-50 px-4 py-3 border-b">
+                <CardTitle className="text-base font-medium">Drug Request</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-3">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start h-12 text-left text-sm px-4 py-3 rounded-lg border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                >
+                  Indent Request
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start h-12 text-left text-sm px-4 py-3 rounded-lg border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                >
+                  Indent Search
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start h-12 text-left text-sm px-4 py-3 rounded-lg border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                >
+                  Bulk Approval
+                </Button>
+              </CardContent>
+            </Card>
+
+
+            {/* Drug Administration Card */}
+            <Card className="shadow-sm">
+              <CardHeader className="bg-gray-50 px-4 py-3 border-b">
+                <CardTitle className="text-base font-medium">Drug Administration</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-3">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start h-12 text-left text-sm px-4 py-3 rounded-lg border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                >
+                  Distribute Drug
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start h-12 text-left text-sm px-4 py-3 rounded-lg border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                >
+                  Make Ward Stock Garbage
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Pharmacy Report Card */}
+            <Card className="shadow-sm">
+              <CardHeader className="bg-gray-50 px-4 py-3 border-b">
+                <CardTitle className="text-base font-medium">Pharmacy Report</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-3">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start h-12 text-left text-sm px-4 py-3 rounded-lg border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                >
+                  Ward Stock Report
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start h-12 text-left text-sm px-4 py-3 rounded-lg border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                >
+                  Distribute Report
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start h-12 text-left text-sm px-4 py-3 rounded-lg border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                >
+                  Ward Garbage Report
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start h-12 text-left text-sm px-4 py-3 rounded-lg border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                >
+                  MIS Report
+                </Button>
+              </CardContent>
+            </Card>
           </div>
-        )}
-
-        {activeSubNav === "Nurse Chart List" && (
-          <Card className="flex-1 flex items-center justify-center shadow-sm">
-            <CardContent className="text-center">
-              <CardTitle className="text-xl text-muted-foreground">
-                Nurse Chart List
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">Content for this section is not yet implemented.</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {activeSubNav === "Pharmacy" && (
-          <Card className="flex-1 flex items-center justify-center shadow-sm">
-            <CardContent className="text-center">
-              <CardTitle className="text-xl text-muted-foreground">
-                Pharmacy
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">Content for this section is not yet implemented.</p>
-            </CardContent>
-          </Card>
         )}
       </main>
     </div>

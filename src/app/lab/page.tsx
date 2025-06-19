@@ -173,4 +173,3 @@ export default function LabPage({ patient }: { patient?: Patient }) {
     </div>
   );
 }
-

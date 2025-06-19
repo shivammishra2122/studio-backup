@@ -158,23 +158,23 @@ export async function fetchClinicalNotes({
         }
     };
 
-    const formattedFromDate = formatDate(fromDate);
-    const formattedToDate = formatDate(toDate || new Date().toISOString().split('T')[0]);
+    // Only format dates if they are provided
+    const formattedFromDate = fromDate ? formatDate(fromDate) : '';
+    const formattedToDate = toDate ? formatDate(toDate) : '';
 
     const body: any = {
         UserName: 'CPRS-UAT',
         Password: 'UAT@123',
         PatientSSN: patientSSN,
-        FromDate: formattedFromDate,
-        ToDate: formattedToDate,
         DUZ,
         ihtLocation,
         ewd_sessid,
     };
 
-    if (status) {
-        body.status = status;
-    }
+    // Only add date fields if they have values
+    if (formattedFromDate) body.FromDate = formattedFromDate;
+    if (formattedToDate) body.ToDate = formattedToDate;
+    if (status) body.status = status;
 
     console.log('Sending request to clinical notes API:', {
         url: API_ENDPOINTS.CLINICAL_NOTES,
