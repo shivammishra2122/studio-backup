@@ -96,13 +96,15 @@ export function PatientDetailsModal({ isOpen, onClose, patient }: PatientDetails
                   <span className="text-sm text-gray-500">Admission Date</span>
                   <span className="text-sm font-medium text-gray-900">{formatDate(patient.admissionDate)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">Ward No</span>
-                  <span className="text-sm font-medium text-gray-900">{patient.wardNo || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">Bed No</span>
-                  <span className="text-sm font-medium text-gray-900">{patient.bedDetails || 'N/A'}</span>
+                <div className="space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Ward No</span>
+                    <span className="text-sm font-medium text-gray-900">{patient.wardNo || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Bed No</span>
+                    <span className="text-sm font-medium text-gray-900">{patient.bedDetails || 'N/A'}</span>
+                  </div>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-500">Length of Stay</span>

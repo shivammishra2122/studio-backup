@@ -41,14 +41,15 @@ export interface RadiologyEntry {
 }
 
 export const fetchRadiologyOrders = async (patientIdentifier: string): Promise<RadiologyEntry[]> => {
-  // Use default SSN if the provided one is empty
-  const ssnToUse = patientIdentifier.trim() || '671209686';
+  if (!patientIdentifier?.trim()) {
+    throw new Error('Patient identifier is required');
+  }
   
   const apiUrl = 'http://3.6.230.54:4003/api/apiOrdRadListNew.sh';
   const requestBody = {
     UserName: 'CPRS-UAT',
     Password: 'UAT@123',
-    PatientSSN: ssnToUse,
+    PatientSSN: patientIdentifier.trim(),
     DUZ: '115',
     ihtLocation: 102,
     FromDate: '',
@@ -56,10 +57,7 @@ export const fetchRadiologyOrders = async (patientIdentifier: string): Promise<R
     rcpoeOrdSt: '11'
   };
   
-  console.log('Using SSN:', ssnToUse);
-
-  console.log('Making API request to:', apiUrl);
-  console.log('Request body:', JSON.stringify(requestBody, null, 2));
+  console.log('Fetching radiology orders for patient:', patientIdentifier);
 
   try {
     const response = await fetch(apiUrl, {

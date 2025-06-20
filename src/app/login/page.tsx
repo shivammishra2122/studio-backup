@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useToast } from "@/hooks/use-toast";
-import Cookies from 'js-cookie';
+import { setSession } from '@/lib/auth-utils';
 import { authApi } from '@/services/api';
 
 // Types
@@ -112,9 +112,14 @@ export default function LoginPage() {
       console.log('Login API Response:', result);
 
       if (result.succeeded === true) {
-        // Store user data in session/local storage if needed
-        document.cookie = 'isAuthenticated=true; path=/';
-        localStorage.setItem('user', JSON.stringify({ username: result.DUZName || '' }));
+        // Store user data in session
+        setSession({
+          duz: result.DUZ || '',
+          htLocation: data.locationId,
+          userName: data.accessCode,
+          password: data.verificationCode,
+          name: result.DUZName
+        });
         
         toast({
           title: "Login Successful",

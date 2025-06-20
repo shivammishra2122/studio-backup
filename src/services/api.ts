@@ -1,8 +1,23 @@
 import axios from 'axios';
+import { getSession } from '@/lib/auth-utils';
 
 // Base URLs
 export const AUTH_BASE_URL = 'http://192.168.1.53/cgi-bin';
-export const API_BASE_URL = 'http://3.6.230.54:4003/api';
+export const API_BASE_URL = 'http://192.168.1.53/cgi-bin';
+
+// Helper function to get auth params
+const getAuthParams = () => {
+  const session = getSession();
+  if (!session) {
+    throw new Error('User not authenticated');
+  }
+  return {
+    UserName: session.userName,
+    Password: session.password,
+    DUZ: session.duz,
+    htLocation: session.htLocation
+  };
+};
 
 // API Endpoints
 export const API_ENDPOINTS = {
@@ -91,34 +106,37 @@ interface PatientSearchParams {
 }
 
 export const apiService = {
-    async getPatients(searchSSN?: string) {
+    async getPatients(searchParams: Record<string, any> = {}) {
         try {
-            const searchParams: PatientSearchParams = {
-                UserName: "CPRS-UAT",
-                Password: "UAT@123",
-                DUZ: "115",
-                PatientSSN: searchSSN || "",
-                lname: "",
-                cpDOB: "",
-                mno: "",
-                cpIPNo: "",
-                SearchType: searchSSN ? "1" : "2"
+            const params = {
+                UserName: 'CPRS-UAT',
+                Password: 'UAT@123',
+                DUZ: '115',
+                PatientSSN: searchParams.searchSSN || "",
+                lname: searchParams.lname || "",
+                cpDOB: searchParams.cpDOB || "",
+                mno: searchParams.mno || "",
+                cpIPNo: searchParams.cpIPNo || "",
+                SearchType: searchParams.SearchType || "1"
             };
 
-            const response = await api.post(API_ENDPOINTS.PATIENTS, searchParams);
+            const response = await api.post(API_ENDPOINTS.PATIENTS, params);
 
-            if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+            if (response.data && typeof response.data === 'object') {
+                // Convert the object of patients to an array
                 const patients = Object.values(response.data);
-                if (searchSSN) {
-                    return patients.filter((p: any) => String(p.SSN || '') === searchSSN);
-                } else {
-                    return patients;
+                
+                if (searchParams.searchSSN) {
+                    return patients.filter((p: any) => 
+                        (p.SSN || p['SSN No'] || '') === searchParams.searchSSN
+                    );
                 }
+                return patients;
             }
             return [];
         } catch (error) {
-            console.error('Error fetching patients:', error);
-            return [];
+            console.error('Error in getPatients:', error);
+            throw error;
         }
     }
 };
@@ -130,7 +148,7 @@ export async function fetchClinicalNotes({
     status,
     ihtLocation = 102,
     ewd_sessid = '',
-    DUZ = '115',
+    DUZ = '80',
 }: {
     patientSSN: string;
     fromDate?: string;
@@ -284,15 +302,17 @@ export const authApi = {
   login: async (credentials: { access: string; verify: string; htLocation?: string }) => {
     const response = await axios.post(API_ENDPOINTS.LOGIN, {
       ...credentials,
-      UserName: 'CPRS-UAT',
-      Password: 'UAT@123'
+      UserName: 'CPRS-UAT',  // Keep these for initial login only
+      Password: 'UAT@123'     // These will be replaced after first successful login
     });
     return response.data;
   },
   
   getLocations: async (accessCode: string) => {
     const response = await axios.post(API_ENDPOINTS.LOCATIONS, {
-      access: accessCode
+      access: accessCode,
+      UserName: 'CPRS-UAT',  // Keep these for initial location fetch
+      Password: 'UAT@123'
     });
     return response.data;
   }

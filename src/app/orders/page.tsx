@@ -37,7 +37,6 @@ import type { Patient } from '@/lib/constants';
 import type { NextPage } from 'next';
 import { apiService } from '@/services/api'; // Import api
 
-
 // Add OrdersPageProps interface
 interface OrdersPageProps {
   patient: Patient;
@@ -351,10 +350,17 @@ const CpoeOrderListView = ({ patient }: { patient: Patient }) => {
     setLoadingLabOrders(true);
     setError(null);
 
+    if (!patient?.ssn) {
+      console.error('No patient SSN available');
+      setError('Patient SSN is required');
+      setLoadingLabOrders(false);
+      return;
+    }
+
     const requestBody = {
       UserName: 'CPRS-UAT',
       Password: 'UAT@123',
-      PatientSSN: '670768354', // Test SSN for CPOE list
+      PatientSSN: patient.ssn, // Use direct SSN access
       DUZ: '115',
       ihtLocation: 102,
       FromDate: '',
@@ -403,7 +409,7 @@ const CpoeOrderListView = ({ patient }: { patient: Patient }) => {
         setError('Failed to fetch orders: ' + err.message);
       })
       .finally(() => setLoadingLabOrders(false));
-  }, [patient.ssn]);
+  }, [patient]);
 
   const filteredOrders = orders.filter(order => {
     const serviceMatch = serviceFilter ? order.Service.toLowerCase() === serviceFilter.toLowerCase() : true;
@@ -704,10 +710,7 @@ const IpMedicationView = ({ patient }: { patient: Patient }) => {
     setLoadingLabOrders(true);
     setError(null);
 
-    // Use the hardcoded SSN for development
-    const patientSSN = patient?.ssn || '670768354';
-    
-    if (!patientSSN) {
+    if (!patient?.ssn) {
       setError('Patient SSN not available.');
       setLoadingLabOrders(false);
       return;
@@ -716,15 +719,15 @@ const IpMedicationView = ({ patient }: { patient: Patient }) => {
     const requestBody = {
       UserName: 'CPRS-UAT',
       Password: 'UAT@123',
-      PatientSSN: patientSSN, // Use the derived patient SSN
+      PatientSSN: patient.ssn, // Use direct SSN access
       DUZ: '115',
       rcpoeOrdIP: 99,
       rordFrmDtPha: '',
       rordToDtPha: ''
     };
     
-    console.log('Fetching IP medications for SSN:', patientSSN);
-
+    console.log('Fetching IP medications for SSN:', patient.ssn);
+    
     console.log('Sending request to API with body:', JSON.stringify(requestBody, null, 2));
     
     fetch('http://3.6.230.54:4003/api/apiOrdMedList.sh', {
@@ -1140,66 +1143,68 @@ const RadiologyView = ({ patient }: { patient: Patient }) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchRadiologyOrders = async () => {
-      setLoadingLabOrders(true);
-      setError(null);
+    setLoadingLabOrders(true);
+    setError(null);
 
-      const requestBody = {
-        UserName: "CPRS-UAT",
-        Password: "UAT@123",
-        PatientSSN: '671209686', // Test SSN for Radiology
-        DUZ: "115",
-        ihtLocation: 102,
-        FromDate: orderFromDate, // Using state for date filters
-        ToDate: orderToDate, // Using state for date filters
-        rcpoeOrdSt: "11"
-      };
+    if (!patient?.ssn) {
+      setError('Patient SSN not available.');
+      setLoadingLabOrders(false);
+      return;
+    }
 
-      try {
-        const response = await fetch('http://3.6.230.54:4003/api/apiOrdRadListNew.sh', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(requestBody),
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log('Radiology API response:', data);
-
-        if (!data || Object.keys(data).length === 0 || data.errors) {
-          setRadiologyOrders([]);
-          setError('No data found');
-        } else {
-          // Assuming data is an object where values are the radiology entries
-          const ordersArray = Object.values(data).map((item: any) => ({
-            id: item['Order IEN']?.toString() || item['Imaging Procedure'] || Date.now().toString() + Math.random().toString(36).slice(2, 9),
-            testName: item['Imaging Procedure'] || 'N/A',
-            orderDate: item['Exam Date/Time'] ? item['Exam Date/Time'].split(' ')[0] : '',
-            orderTime: item['Exam Date/Time'] ? item['Exam Date/Time'].split(' ')[1] : '',
-            startDate: '', // API response doesn't seem to have separate start/stop dates
-            startTime: '',
-            provider: item.Provider || 'N/A',
-            status: item.Status as any || 'UNKNOWN',
-            location: item.Location || 'N/A',
-            result: item.Result || '' // Add result field from API
-          }));
-          setRadiologyOrders(ordersArray);
-        }
-      } catch (err: any) {
-        console.error('Error fetching radiology orders:', err);
-        setError('Failed to fetch radiology orders: ' + err.message);
-      } finally {
-        setLoadingLabOrders(false);
-      }
+    const requestBody = {
+      UserName: "CPRS-UAT",
+      Password: "UAT@123",
+      PatientSSN: patient.ssn, // Use direct SSN access
+      DUZ: "115",
+      ihtLocation: 102,
+      FromDate: orderFromDate, // Using state for date filters
+      ToDate: orderToDate, // Using state for date filters
+      rcpoeOrdSt: "11"
     };
 
-    fetchRadiologyOrders();
+    try {
+      const response = await fetch('http://3.6.230.54:4003/api/apiOrdRadListNew.sh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Radiology API response:', data);
+
+      if (!data || Object.keys(data).length === 0 || data.errors) {
+        setRadiologyOrders([]);
+        setError('No data found');
+      } else {
+        // Assuming data is an object where values are the radiology entries
+        const ordersArray = Object.values(data).map((item: any) => ({
+          id: item['Order IEN']?.toString() || item['Imaging Procedure'] || Date.now().toString() + Math.random().toString(36).slice(2, 9),
+          testName: item['Imaging Procedure'] || 'N/A',
+          orderDate: item['Exam Date/Time'] ? item['Exam Date/Time'].split(' ')[0] : '',
+          orderTime: item['Exam Date/Time'] ? item['Exam Date/Time'].split(' ')[1] : '',
+          startDate: '', // API response doesn't seem to have separate start/stop dates
+          startTime: '',
+          provider: item.Provider || 'N/A',
+          status: item.Status as any || 'UNKNOWN',
+          location: item.Location || 'N/A',
+          result: item.Result || '' // Add result field from API
+        }));
+        setRadiologyOrders(ordersArray);
+      }
+    } catch (err: any) {
+      console.error('Error fetching radiology orders:', err);
+      setError('Failed to fetch radiology orders: ' + err.message);
+    } finally {
+      setLoadingLabOrders(false);
+    }
   }, [patient, orderFromDate, orderToDate]); // Depend on patient and date filters
 
   const filteredRadiologyOrders = radiologyOrders.filter(order => {
@@ -1355,7 +1360,7 @@ const RadiologyView = ({ patient }: { patient: Patient }) => {
                     <TableCell className="py-1.5 px-3">{order.location}</TableCell>
                   </TableRow>
                 )) : (
-                  <TableRow key="no-radiology-orders">
+                  <TableRow>
                     <TableCell colSpan={radiologyTableHeaders.length} className="text-center py-10 text-muted-foreground">
                       No radiology orders found.
                     </TableCell>
@@ -1381,45 +1386,41 @@ const RadiologyView = ({ patient }: { patient: Patient }) => {
 
 // Lab CPOE List View
 const LabCpoeListView = ({ patient }: { patient: Patient }) => {
-  const [visitDate, setVisitDate] = useState<string | undefined>("16 MAY, 2024 16:22");
-  const [statusFilter, setStatusFilter] = useState<string | undefined>("All");
-  const [orderFromDate, setOrderFromDate] = useState<string>("");
-  const [orderToDate, setOrderToDate] = useState<string>("");
-  const [showEntries, setShowEntries] = useState<string>("All");
-  const [searchText, setSearchText] = useState<string>("");
-  const [loadingLabOrders, setLoadingLabOrders] = useState(true);
-  const [labOrders, setLabOrders] = useState<any[]>([]);
+  const [labOrders, setLabOrders] = useState<LabCpoeDataType[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [sectionFilter, setSectionFilter] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [showEntries, setShowEntries] = useState<string>("10");
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
-  // Hardcoded SSN
-  const hardcodedSSN = "670768354";
-
-  // Fetch lab orders using the hardcoded SSN
   useEffect(() => {
+    if (!patient) return;
+    
+    if (!patient?.ssn) {
+      setError('Patient SSN not available');
+      setLoading(false);
+      return;
+    }
+
     const fetchLabOrders = async () => {
       try {
-        setLoadingLabOrders(true);
-        setError(null);
-
-        console.log('Fetching lab orders for SSN:', hardcodedSSN);
-        console.log('Date range:', { from: orderFromDate, to: orderToDate });
-
-        const requestBody = {
-          UserName: "CPRS-UAT",
-          Password: "UAT@123",
-          PatientSSN: hardcodedSSN,
-          DUZ: "115",
-          FromDate: orderFromDate,
-          ToDate: orderToDate
-        };
-
-        const response = await fetch('http://3.6.230.54:4003/api/apiOrdLabList.sh', {
+        setLoading(true);
+        const response = await fetch('http://3.6.230.54:4003/api/apiLabCPOEList.sh', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
           },
-          body: JSON.stringify(requestBody),
+          body: JSON.stringify({
+            UserName: 'CPRS-UAT',
+            Password: 'UAT@123',
+            PatientSSN: patient.ssn, // Use direct SSN access
+            DUZ: '115',
+            ihtLocation: 102,
+            FromDate: '',
+            ToDate: '',
+            Action: 'L'
+          }),
         });
 
         if (!response.ok) {
@@ -1427,40 +1428,44 @@ const LabCpoeListView = ({ patient }: { patient: Patient }) => {
         }
 
         const data = await response.json();
+        
+        // Transform the API response to match our interface
+        const orders = Object.entries(data).map(([key, value]: [string, any]) => ({
+          id: key,
+          section: value.Section || 'UNKNOWN',
+          labTest: value['Lab Test'] || 'N/A',
+          sample: value.Sample || 'N/A',
+          orderDate: value['Order Date'] || '',
+          orderTime: value['Order Time'] || '',
+          startDate: value['Start Date'] || '',
+          startTime: value['Start Time'] || '',
+          status: value.Status || 'UNKNOWN',
+        }));
 
-        if (!data || Object.keys(data).length === 0) {
-          setLabOrders([]);
-          setError('No lab orders found');
-        } else {
-          // Convert the object of orders to an array
-          const ordersArray = Object.entries(data).map(([key, value]) => ({
-            id: key,
-            ...(value as object)
-          }));
-          setLabOrders(ordersArray);
-        }
+        setLabOrders(orders);
       } catch (err) {
         console.error('Error fetching lab orders:', err);
-        setError('Failed to fetch lab orders: ' + (err instanceof Error ? err.message : 'Unknown error'));
+        setError('Failed to load lab orders');
       } finally {
-        setLoadingLabOrders(false);
+        setLoading(false);
       }
     };
 
     fetchLabOrders();
-  }, [orderFromDate, orderToDate]); // Removed patientSsn dependency as we're using hardcoded SSN
+  }, [patient.ssn]);
 
   const filteredLabOrders = labOrders.filter(order => {
-    const matchesSearch = searchText === '' ||
-      order["Lab Test"].toLowerCase().includes(searchText.toLowerCase()) ||
-      order.Section.toLowerCase().includes(searchText.toLowerCase());
-
-    const matchesStatus = statusFilter === 'All' || order.Status === statusFilter;
-
-    return matchesSearch && matchesStatus;
+    const matchesSection = sectionFilter ? order.section.toLowerCase() === sectionFilter.toLowerCase() : true;
+    const matchesSearch = searchTerm ? Object.values(order).some((value) => (value as any)?.toString().toLowerCase().includes(searchTerm.toLowerCase())) : true;
+    return matchesSection && matchesSearch;
   });
 
-  const labCpoeTableHeaders = ["Section", "Lab Test", "Order Date", "Status", "Result", "Result Date", "Order Sign", "Discontinue"];
+  const totalPages = Math.ceil(filteredLabOrders.length / parseInt(showEntries));
+  const startIndex = (currentPage - 1) * parseInt(showEntries);
+  const endIndex = startIndex + parseInt(showEntries);
+  const paginatedLabOrders = filteredLabOrders.slice(startIndex, endIndex);
+
+  const labCpoeTableHeaders = ["Section", "Lab Test", "Sample", "Order Date", "Order Time", "Start Date", "Start Time", "Status"];
 
   return (
     <Card className="flex-1 flex flex-col shadow overflow-hidden">
@@ -1480,63 +1485,44 @@ const LabCpoeListView = ({ patient }: { patient: Patient }) => {
       <CardContent className="p-2.5 flex-1 flex flex-col overflow-hidden">
         <div className="space-y-2 mb-2 text-xs">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <Label htmlFor="labVisitDate" className="shrink-0">Visit Date</Label>
-            <Select value={visitDate} onValueChange={setVisitDate}>
-              <SelectTrigger id="labVisitDate" className="h-7 w-32 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="16 MAY, 2024 16:22">16 MAY, 2024 16:22</SelectItem>
-              </SelectContent>
-            </Select>
-            <Label htmlFor="labStatus" className="shrink-0">Status</Label>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger id="labStatus" className="h-7 w-24 text-xs">
+            <Label htmlFor="labSection" className="shrink-0">Section</Label>
+            <Select value={sectionFilter} onValueChange={setSectionFilter}>
+              <SelectTrigger id="labSection" className="h-7 w-24 text-xs">
                 <SelectValue placeholder="Select" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="All">All</SelectItem>
-                <SelectItem value="PENDING">PENDING</SelectItem>
-                <SelectItem value="COMPLETED">COMPLETED</SelectItem>
-                <SelectItem value="CANCELLED">CANCELLED</SelectItem>
+                {Array.from(new Set(labOrders.map(order => order.section))).map(section => (
+                  <SelectItem key={`section-${section}`} value={section}>{section}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
-            <Label htmlFor="labOrderFrom" className="shrink-0">Order From</Label>
-            <div className="relative">
-              <Input id="labOrderFrom" type="text" value={orderFromDate} onChange={e => setOrderFromDate(e.target.value)} className="h-7 w-24 text-xs pr-7" aria-label="Lab Order From Date" placeholder="DD/MM/YYYY" />
-              <CalendarDays className="h-3.5 w-3.5 absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            </div>
-            <Label htmlFor="labOrderTo" className="shrink-0">Order To</Label>
-            <div className="relative">
-              <Input id="labOrderTo" type="text" value={orderToDate} onChange={e => setOrderToDate(e.target.value)} className="h-7 w-24 text-xs pr-7" aria-label="Lab Order To Date" placeholder="DD/MM/YYYY" />
-              <CalendarDays className="h-3.5 w-3.5 absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            </div>
+            <Label htmlFor="labSearch" className="shrink-0">Search:</Label>
+            <Input id="labSearch" type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="h-7 w-40 text-xs" />
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <div className="flex items-center space-x-1">
               <Label htmlFor="labShowEntries" className="text-xs shrink-0">Show</Label>
               <Select value={showEntries} onValueChange={setShowEntries}>
-                <SelectTrigger id="labShowEntries" className="h-7 w-20 text-xs">
+                <SelectTrigger id="labShowEntries" className="h-7 w-16 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="All">All</SelectItem>
                   <SelectItem value="10">10</SelectItem>
                   <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
                 </SelectContent>
               </Select>
               <Label htmlFor="labShowEntries" className="text-xs shrink-0">entries</Label>
             </div>
             <div className="flex-grow"></div>
-            <Label htmlFor="labSearch" className="shrink-0">Search:</Label>
-            <Input id="labSearch" type="text" value={searchText} onChange={e => setSearchText(e.target.value)} className="h-7 w-40 text-xs" aria-label="Search Lab Orders" placeholder="Search lab orders..." />
           </div>
         </div>
 
         <div className="flex-1 overflow-auto min-h-0">
-          {loadingLabOrders ? (
+          {loading ? (
             <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">Loading orders...</p>
+              <p className="text-muted-foreground">Loading lab orders...</p>
             </div>
           ) : error ? (
             <div className="flex items-center justify-center h-full">
@@ -1557,27 +1543,19 @@ const LabCpoeListView = ({ patient }: { patient: Patient }) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLabOrders.length > 0 ? filteredLabOrders.map((lab, index) => (
-                  <TableRow key={`lab-${lab["Order IEN"] || lab["Lab Test"]}`} className={`${index % 2 === 0 ? 'bg-muted/30' : ''}`}>
-                    <TableCell className="py-1.5 px-3">{lab.Section}</TableCell>
-                    <TableCell className="py-1.5 px-3">{lab["Lab Test"]}</TableCell>
-                    <TableCell className="py-1.5 px-3">{lab["Order Date"]}</TableCell>
-                    <TableCell className="py-1.5 px-3 text-xs">{lab.Status}</TableCell>
-                    <TableCell className="py-1.5 px-3">{lab.Result}</TableCell>
-                    <TableCell className="py-1.5 px-3">{lab["Result Date"]}</TableCell>
-                    <TableCell className="py-1.5 px-3 text-center">
-                      <Button variant="ghost" size="icon" className="h-6 w-6">
-                        <PenLine className="h-3.5 w-3.5 text-blue-600" />
-                      </Button>
-                    </TableCell>
-                    <TableCell className="py-1.5 px-3 text-center">
-                      <Button variant="ghost" size="icon" className="h-6 w-6">
-                        <Ban className="h-3.5 w-3.5 text-red-500" />
-                      </Button>
-                    </TableCell>
+                {paginatedLabOrders.length > 0 ? paginatedLabOrders.map((lab, index) => (
+                  <TableRow key={`lab-${lab.id}`} className={`${index % 2 === 0 ? 'bg-muted/30' : ''}`}>
+                    <TableCell className="py-1 px-3">{lab.section}</TableCell>
+                    <TableCell className="py-1 px-3">{lab.labTest}</TableCell>
+                    <TableCell className="py-1 px-3">{lab.sample}</TableCell>
+                    <TableCell className="py-1 px-3">{lab.orderDate}</TableCell>
+                    <TableCell className="py-1 px-3">{lab.orderTime}</TableCell>
+                    <TableCell className="py-1 px-3">{lab.startDate}</TableCell>
+                    <TableCell className="py-1 px-3">{lab.startTime}</TableCell>
+                    <TableCell className="py-1 px-3 text-xs">{lab.status}</TableCell>
                   </TableRow>
                 )) : (
-                  <TableRow key="no-lab-orders">
+                  <TableRow>
                     <TableCell colSpan={labCpoeTableHeaders.length} className="text-center py-10 text-muted-foreground">
                       No lab orders found.
                     </TableCell>
@@ -1589,11 +1567,11 @@ const LabCpoeListView = ({ patient }: { patient: Patient }) => {
         </div>
 
         <div className="flex items-center justify-between p-2.5 border-t text-xs text-muted-foreground mt-auto">
-          <div>Showing {filteredLabOrders.length > 0 ? 1 : 0} to {filteredLabOrders.length} of {filteredLabOrders.length} entries</div>
+          <div>Showing {paginatedLabOrders.length > 0 ? startIndex + 1 : 0} to {Math.min(endIndex, filteredLabOrders.length)} of {filteredLabOrders.length} entries</div>
           <div className="flex items-center space-x-1">
-            <Button variant="outline" size="sm" className="h-7 text-xs px-2 py-1">Previous</Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs px-2 py-1 bg-accent text-foreground border-border">1</Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs px-2 py-1">Next</Button>
+            <Button variant="outline" size="sm" className="h-7 text-xs px-2 py-1" onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}>Previous</Button>
+            <Button variant="outline" size="sm" className="h-7 text-xs px-2 py-1 bg-accent text-foreground border-border">{currentPage}</Button>
+            <Button variant="outline" size="sm" className="h-7 text-xs px-2 py-1" onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages}>Next</Button>
           </div>
         </div>
       </CardContent>
@@ -1601,8 +1579,7 @@ const LabCpoeListView = ({ patient }: { patient: Patient }) => {
   );
 };
 
-// Using the VisitData interface defined earlier in the file
-
+// Visit/ADT View
 const VisitAdtView = ({ patient }: { patient: Patient }) => {
   const [visitDate, setVisitDate] = useState<string | undefined>("Select");
   const [visitDetails, setVisitDetails] = useState<VisitData[]>([]);
@@ -1617,25 +1594,26 @@ const VisitAdtView = ({ patient }: { patient: Patient }) => {
     setLoadingLabOrders(true);
     setError(null);
 
-    // Use the provided patient's SSN or fall back to the default SSN
-    const patientSSN = patient?.ssn || '670768354';
-    console.log('Using SSN:', patientSSN);
+    if (!patient?.ssn) {
+      setError('Patient SSN not available.');
+      setLoadingLabOrders(false);
+      return;
+    }
 
     const requestBody = {
       UserName: "CPRS-UAT",
       Password: "UAT@123",
-      PatientSSN: patientSSN,
+      PatientSSN: patient.ssn,
       DUZ: "115"
     };
 
     console.log('Fetching visit details for SSN:', patient.ssn);
     
-    const apiUrl = 'http://3.6.230.54:4003/api/apiPatVstDtl.sh';
-    console.log('API URL:', apiUrl);
+    console.log('API URL:', 'http://3.6.230.54:4003/api/apiPatVstDtl.sh');
     
     console.log('Sending request with body:', JSON.stringify(requestBody, null, 2));
     
-    fetch(apiUrl, {
+    fetch('http://3.6.230.54:4003/api/apiPatVstDtl.sh', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

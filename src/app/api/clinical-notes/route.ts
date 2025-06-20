@@ -3,12 +3,20 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    
+    const patientSSN = body.patientSSN;
+
+    if (!patientSSN) {
+      return NextResponse.json(
+        { error: 'Patient SSN is required' },
+        { status: 400 }
+      );
+    }
+
     // Prepare the request data with required fields
     const requestData = {
       UserName: 'CPRS-UAT',
       Password: 'UAT@123',
-      PatientSSN: '210099218',
+      PatientSSN: patientSSN,
       IPNo: '153381',
       AdmissionDate: '',
       Status: body.status || 'DRAFT',

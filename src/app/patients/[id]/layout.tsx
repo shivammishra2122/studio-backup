@@ -5,9 +5,6 @@ import { useParams } from 'next/navigation';
 import { apiService } from '@/services/api';
 import { Patient } from '@/lib/constants';
 import { PatientProvider } from '@/hooks/use-patient';
-// import SidebarNav from '@/components/layout/sidebar-nav';
-// import { TopNav } from '@/components/layout/top-nav';
-// import PatientNav from '@/components/layout/patient-nav';
 
 // Define the API response type
 interface ApiPatient {

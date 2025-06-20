@@ -25,23 +25,29 @@ export const PatientProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPatients = useCallback(async (searchParams?: Record<string, any>) => {
+  const fetchPatients = useCallback(async (searchParams: Record<string, any> = {}) => {
     setLoading(true);
     setError(null);
     try {
-      // Convert searchParams object to query string
-      const queryString = searchParams ? new URLSearchParams(searchParams).toString() : '';
-      
-      // Cast the response to Patient[] since we know the shape of our API response
-      const data = await apiService.getPatients(queryString) as unknown as Patient[];
+      // Get patients data with search params
+      const data = await apiService.getPatients(searchParams) as unknown as Patient[];
       setPatients(Array.isArray(data) ? data : []);
+      
+      // If we have a current patient, update it
+      if (currentPatient) {
+        const updatedPatient = data?.find(p => p.ssn === currentPatient.ssn);
+        if (updatedPatient) {
+          setCurrentPatient(updatedPatient);
+        }
+      }
     } catch (err) {
-      setError('Failed to fetch patients. Please try again.');
-      console.error('Error fetching patients:', err);
+      const error = err as Error;
+      setError(error.message || 'Failed to fetch patients. Please try again.');
+      console.error('Error fetching patients:', error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentPatient]);
 
   const clearError = useCallback(() => {
     setError(null);

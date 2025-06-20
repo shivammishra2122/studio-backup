@@ -12,11 +12,15 @@ export interface ProcedureOrder {
 }
 
 export const fetchProcedureOrders = async (patientSSN: string): Promise<ProcedureOrder[]> => {
+  if (!patientSSN) {
+    throw new Error('Patient SSN is required');
+  }
+
   const apiUrl = 'http://3.6.230.54:4003/api/apiOrdProcList.sh';
   const requestBody = {
     UserName: 'CPRS-UAT',
     Password: 'UAT@123',
-    PatientSSN: patientSSN || '670768354',
+    PatientSSN: patientSSN,
     DUZ: '115',
     ihtLocation: 102,
     FromDate: '',

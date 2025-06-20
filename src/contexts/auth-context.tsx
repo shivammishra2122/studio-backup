@@ -82,14 +82,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      // Call your logout API here if needed
-      // await authApi.logout();
-      
       // Clear user data
       setUser(null);
       localStorage.removeItem('user');
       // Clear the authentication cookie
-      document.cookie = 'isAuthenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      document.cookie = 'isAuthenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
       
       // Force a full page reload to clear any state
       window.location.href = '/login';

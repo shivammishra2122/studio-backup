@@ -20,7 +20,8 @@ import {
   Loader2,
   AlertTriangle,
   RefreshCw as RefreshCwIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  Bell
  } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePatients } from "@/context/patient-context";
@@ -56,8 +57,15 @@ const TABLE_FIELDS: TableField[] = [
   { key: 'MLC', label: 'MLC', icon: AlertTriangle },
 ];
 
-function getStringValue(val: any): string {
+function getStringValue(val: any, key?: string): string {
   if (val == null) return '-';
+  
+  // Format LOS as "[number] days"
+  if (key === 'LOS' && val) {
+    const days = String(val).match(/^(\d+)/)?.[0] || '0';
+    return `${days} day${days === '1' ? '' : 's'}`;
+  }
+  
   return String(val);
 }
 
@@ -106,13 +114,36 @@ export default function PatientsPage() {
 
   const handleAdvancedSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    const params: Record<string, any> = {};
-    if (advName) params.name = advName;
-    if (advDob) params.dob = advDob;
-    if (advPhone) params.phone = advPhone;
-    if (advIp) params.ipno = advIp;
-    await fetchPatients(params);
-    setIsAdvOpen(false);
+    
+    const params: Record<string, string> = {
+      SearchType: "2" // 2 for advanced search
+    };
+    
+    if (advName) params.lname = advName.trim();
+    if (advDob) params.cpDOB = advDob.trim();
+    if (advPhone) params.mno = advPhone.trim();
+    if (advIp) params.cpIPNo = advIp.trim();
+    
+    try {
+      await fetchPatients(params);
+      // Clear form and close dialog only on success
+      setAdvName('');
+      setAdvDob('');
+      setAdvPhone('');
+      setAdvIp('');
+      setIsAdvOpen(false);
+    } catch (error) {
+      console.error('Advanced search failed:', error);
+      // Error is already handled in the context
+    }
+  };
+
+  const handleSearch = () => {
+    if (searchQuery.trim()) {
+      fetchPatients({ search: searchQuery.trim() });
+    } else {
+      fetchPatients({});
+    }
   };
 
   const handleSort = useCallback((key: TableFieldKey) => {
@@ -154,6 +185,7 @@ export default function PatientsPage() {
     if (target.tagName === 'A' || target.tagName === 'BUTTON' || target.closest('a, button')) {
       return;
     }
+    
     if (patient.DFN) {
       router.push(`/patients/${patient.DFN}`);
     }
@@ -188,20 +220,30 @@ export default function PatientsPage() {
       <div className="flex flex-col">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold text-[#2d3748]">Patient List</h1>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="flex items-center gap-1.5 text-xs h-8"
-          >
-            {isRefreshing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <RefreshCwIcon className="h-3.5 w-3.5" />
-            )}
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="icon"
+              className="h-8 w-8 p-0"
+              aria-label="Notifications"
+            >
+              <Bell className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-1.5 text-xs h-8"
+            >
+              {isRefreshing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCwIcon className="h-3.5 w-3.5" />
+              )}
+              Refresh
+            </Button>
+          </div>
         </div>
         <p className="text-xs text-gray-600">
           {filteredPatients.length} {filteredPatients.length === 1 ? 'patient' : 'patients'} found
@@ -214,16 +256,18 @@ export default function PatientsPage() {
         <RadioGroup
           value={filterCategory}
           onValueChange={setFilterCategory}
-          className="flex flex-wrap gap-x-12 gap-y-2 text-sm md:flex-1"
+          className="w-full"
         >
-          {['Appointments', "Ward's", "Provider's", 'Emergency', "Team/Personal's", 'Specialties', 'Default', 'New Order Dashboard'].map((cat) => (
-            <div key={cat} className="flex items-center space-x-1.5">
-              <RadioGroupItem value={cat} id={cat} className="h-3.5 w-3.5" />
-              <Label htmlFor={cat} className="text-xs whitespace-nowrap cursor-pointer">
-                {cat}
-              </Label>
-            </div>
-          ))}
+          <div className="grid grid-cols-4 gap-2">
+            {['Appointments', "Ward's", "Provider's", 'Emergency', "Team/Personal's", 'Specialties', 'Default', 'New Order Dashboard'].map((cat) => (
+              <div key={cat} className="flex items-center space-x-1.5">
+                <RadioGroupItem value={cat} id={cat} className="h-3.5 w-3.5" />
+                <Label htmlFor={cat} className="text-xs whitespace-nowrap cursor-pointer">
+                  {cat}
+                </Label>
+              </div>
+            ))}
+          </div>
         </RadioGroup>
 
         {/* Client-side search filter */}
@@ -240,11 +284,25 @@ export default function PatientsPage() {
 
         {/* Search Buttons */}
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="default" onClick={() => setSearchQuery(searchQuery)} className="h-8 text-xs">Search</Button>
+          <Button 
+            size="sm" 
+            variant="default" 
+            onClick={handleSearch} 
+            className="h-8 text-xs"
+          >
+            Search
+          </Button>
 
           <Dialog open={isAdvOpen} onOpenChange={setIsAdvOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" variant="outline" className="h-8 text-xs">Advanced</Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="h-8 text-xs"
+                onClick={() => setIsAdvOpen(true)}
+              >
+                Advanced
+              </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
@@ -345,7 +403,7 @@ export default function PatientsPage() {
                         key={`${patient.DFN}-${field.key}`} 
                         className="px-4 py-3 whitespace-nowrap text-sm text-gray-900"
                       >
-                        {getStringValue(patient[field.key as keyof typeof patient])}
+                        {getStringValue(patient[field.key as keyof typeof patient], field.key)}
                       </td>
                     ))}
                   </tr>

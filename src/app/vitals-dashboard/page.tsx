@@ -87,6 +87,7 @@ import { usePatientAllergies } from '@/hooks/usePatientAllergies';
 import { usePatientComplaints } from '@/hooks/usePatientComplaints';
 import { fetchIntakeOutputData, fetchIntakeUpdateData, IntakeOutputSummary } from '@/services/intakeOutput';
 import { submitVitalEntry } from '@/services/vitalEntry';
+import { getPatientSSN } from '@/utils/patientUtils';
 
 const verticalNavItems = [
   "Vitals", "Intake/Output", "Problems", "Final Diagnosis",
@@ -117,7 +118,7 @@ const getYAxisConfig = (vitalName: string): { label: string; domain: [number | s
   }
 };
 
-const VitalsView = () => {
+const VitalsView = React.FC<{ patient?: Patient }> = ({ patient }) => {
   const [visitDateState, setVisitDateState] = useState<string | undefined>("today");
   const [fromDateValue, setFromDateValue] = useState<string>("");
   const [toDateValueState, setToDateValueState] = useState<string>("");
@@ -169,11 +170,25 @@ const VitalsView = () => {
     e.preventDefault();
     
     try {
+      // Use getPatientSSN to handle SSN extraction consistently
+      const patientSSN = patient ? getPatientSSN(patient) : '';
+      
+      if (!patientSSN) {
+        console.error('Patient SSN is required');
+        alert('Patient SSN is missing. Please ensure patient data is loaded correctly.');
+        return;
+      }
+      
       // Format the vitals data for the API
       const formattedData = {
-        PatientSSN: "210099218", // This should come from the patient context
-        IPNo: "153381", // This should come from the patient context
+        PatientSSN: patientSSN, // Now using the normalized SSN
+        IPNo: patient?.ipNo || "",
         EntredID: "",
+        EntredDateTime: new Date().toLocaleDateString('en-US'),
+        EditDateTime: "",
+        Status: "ACTIVE",
+        UserName: "CPRS-UAT",
+        Password: "UAT@123",
         Temperature: vitalsEntryData.temperatureValue ? `${vitalsEntryData.temperatureValue}°${vitalsEntryData.temperatureUnit}` : "",
         Pulse: vitalsEntryData.pulseValue || "",
         Respiration: vitalsEntryData.respirationValue || "",
@@ -251,7 +266,7 @@ const VitalsView = () => {
         body: JSON.stringify({
           UserName: 'CPRS-UAT',
           Password: 'UAT@123',
-          PatientSSN: '671106286',
+          PatientSSN: patient?.ssn,
           DUZ: '115'
         })
       });
@@ -291,7 +306,7 @@ const VitalsView = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedVitalForGraph]);
+  }, [selectedVitalForGraph, patient]);
 
   const handleVitalRowClick = (vitalName: string) => {
     console.log('Vital selected:', vitalName);
@@ -377,7 +392,7 @@ const VitalsView = () => {
     <div className="flex flex-col md:flex-row gap-3 w-full h-full">
       <div className="flex-1 min-w-0 flex flex-col border rounded-md bg-card shadow">
         <div className="flex items-center justify-between py-1.5 px-3 border-b bg-card text-foreground rounded-t-md">
-          <h2 className="text-sm font-medium">{isVitalsEntryMode ? "Vitals Entry" : "Vitals"}</h2>
+          <h2 className="text-sm">{isVitalsEntryMode ? "Vitals Entry" : "Vitals"}</h2>
           <div className="flex items-center space-x-1">
             <Button variant="ghost" size="icon" className="h-6 w-6 text-primary hover:bg-muted/50" onClick={() => setIsVitalsEntryMode(!isVitalsEntryMode)}>
               <Edit3 className="h-3.5 w-3.5" />
@@ -391,11 +406,11 @@ const VitalsView = () => {
               <Table className="text-xs">
                 <TableHeader className="sticky top-0 z-0">
                   <VitalsTableRow className="bg-blue-900">
-                    <TableHead className="text-white font-semibold py-2 px-3 h-8 border-r border-blue-800">Vitals</TableHead>
-                    <TableHead className="text-white font-semibold py-2 px-3 h-8 border-r border-blue-800">Not Recordable</TableHead>
-                    <TableHead className="text-white font-semibold py-2 px-3 h-8 border-r border-blue-800">Value</TableHead>
-                    <TableHead className="text-white font-semibold py-2 px-3 h-8 border-r border-blue-800">Unit</TableHead>
-                    <TableHead className="text-white font-semibold py-2 px-3 h-8">Qualifiers</TableHead>
+                    <TableHead className="text-white py-2 px-3 h-8 border-r border-blue-800">Vitals</TableHead>
+                    <TableHead className="text-white py-2 px-3 h-8 border-r border-blue-800">Not Recordable</TableHead>
+                    <TableHead className="text-white py-2 px-3 h-8 border-r border-blue-800">Value</TableHead>
+                    <TableHead className="text-white py-2 px-3 h-8 border-r border-blue-800">Unit</TableHead>
+                    <TableHead className="text-white py-2 px-3 h-8">Qualifiers</TableHead>
                   </VitalsTableRow>
                 </TableHeader>
                 <TableBody>
@@ -710,12 +725,12 @@ const VitalsView = () => {
                             }`}
                             onClick={() => handleVitalRowClick(name)}
                           >
-                            <TableCell className="py-2 px-3 font-medium">{name}</TableCell>
+                            <TableCell className="py-2 px-3">{name}</TableCell>
                             <TableCell className="py-2 px-3 text-right text-xs">
                               {vital.date ? 
                               (vital.date) : '-'}
                             </TableCell>
-                            <TableCell className="py-2 px-3 text-right font-medium">
+                            <TableCell className="py-2 px-3 text-right">
                               {vital.flag === 1 && <span className="text-red-500 mr-1">*</span>}
                               {String(vital.value)}
                             </TableCell>
@@ -737,7 +752,7 @@ const VitalsView = () => {
         </div>
         <div className="flex-1 min-w-0 flex flex-col border rounded-md bg-card shadow">
           <div className="flex items-center p-2 border-b bg-card text-foreground rounded-t-md">
-            <h2 className="text-base font-semibold">{selectedVitalForGraph} Graph</h2>
+            <h2 className="text-base">{selectedVitalForGraph} Graph</h2>
           </div>
           <div className="flex-1 min-w-0 flex flex-col">
           {loading ? (
@@ -788,7 +803,7 @@ const VitalsView = () => {
   );
 };
 
-const IntakeOutputView = () => {
+const IntakeOutputView = ({ patient }: { patient?: Patient }) => {
   const [fromDateValue, setFromDateValue] = useState<string>("05/16/2025 14:05");
   const [toDateValueState, setToDateValueState] = useState<string>("05/17/2025 14:05");
   const [isIntakeOutputEntryMode, setIsIntakeOutputEntryMode] = useState<boolean>(false);
@@ -917,7 +932,7 @@ const IntakeOutputView = () => {
     return (
       <div className="flex-1 flex flex-col">
         <div className="p-2 border-b bg-card text-foreground">
-          <h2 className="text-base font-semibold">{title}</h2>
+          <h2 className="text-base">{title}</h2>
         </div>
         <div className="p-4 flex-1 flex flex-col gap-4">
           <div className="flex items-center gap-4">
@@ -1045,7 +1060,7 @@ const IntakeOutputView = () => {
     return (
       <div className="flex-1 flex flex-col">
         <div className="p-2 border-b bg-card text-foreground">
-          <h2 className="text-base font-semibold">{title}</h2>
+          <h2 className="text-base">{title}</h2>
         </div>
         <div className="flex flex-wrap items-center space-x-3 p-2 border-b text-xs gap-y-2">
           <div className="flex items-center gap-2">
@@ -1109,12 +1124,12 @@ const IntakeOutputView = () => {
           <table className="w-full text-xs border-collapse">
             <thead className="sticky top-0 z-10">
               <tr className="bg-accent text-foreground">
-                <th className="p-1.5 border font-xs text-center">UPDATE</th>
-                <th className="p-1.5 border font-xs text-center">{isIntake ? 'INTAKE DATE/TIME' : 'OUTPUT DATE/TIME'}</th>
-                <th className="p-1.5 border font-xs text-center">{isIntake ? 'INTAKE TYPE' : 'OUTPUT TYPE'}</th>
-                <th className="p-1.5 border font-xs text-center">HOSPITAL LOCATION</th>
-                <th className="p-1.5 border font-xs text-center">AMOUNT</th>
-                <th className="p-1.5 border font-xs text-center">ENTER BY</th>
+                <th className="p-1.5 border text-xs text-center">UPDATE</th>
+                <th className="p-1.5 border text-xs text-center">{isIntake ? 'INTAKE DATE/TIME' : 'OUTPUT DATE/TIME'}</th>
+                <th className="p-1.5 border text-xs text-center">{isIntake ? 'INTAKE TYPE' : 'OUTPUT TYPE'}</th>
+                <th className="p-1.5 border text-xs text-center">HOSPITAL LOCATION</th>
+                <th className="p-1.5 border text-xs text-center">AMOUNT</th>
+                <th className="p-1.5 border text-xs text-center">ENTER BY</th>
               </tr>
             </thead>
             <tbody className="bg-card">
@@ -1151,7 +1166,7 @@ const IntakeOutputView = () => {
         {currentView === 'summary' ? (
           <>
             <div className="flex items-center justify-between p-2 border-b bg-card text-foreground rounded-t-md">
-              <h2 className="text-base font-semibold">Patient Intake/Output Summary</h2>
+              <h2 className="text-base">Patient Intake/Output Summary</h2>
               <div className="flex items-center space-x-1">
                 <Button 
                   variant={useUpdateData ? 'default' : 'outline'}
@@ -1188,8 +1203,8 @@ const IntakeOutputView = () => {
                   <Table className="text-xs">
                     <thead className="bg-accent sticky top-0 z-10">
                       <tr>
-                        <TableHead className="text-foreground font-semibold py-2 px-3 h-8">Category</TableHead>
-                        <TableHead className="text-foreground font-semibold py-2 px-3 h-8">Value (ml)</TableHead>
+                        <TableHead className="text-foreground py-2 px-3 h-8">Category</TableHead>
+                        <TableHead className="text-foreground py-2 px-3 h-8">Value (ml)</TableHead>
                       </tr>
                     </thead>
                     <TableBody>
@@ -1277,14 +1292,14 @@ const IntakeOutputView = () => {
                   <table className="w-full text-xs border-collapse min-w-[60rem]">
                     <thead className="sticky top-0 z-10">
                       <tr className="bg-accent text-foreground">
-                        <th colSpan={inputHeaders.length} className="p-2 border text-center font-semibold">Input</th>
-                        <th colSpan={outputHeaders.length} className="p-2 border text-center font-semibold">Output</th>
+                        <th colSpan={inputHeaders.length} className="p-2 border text-center">Input</th>
+                        <th colSpan={outputHeaders.length} className="p-2 border text-center">Output</th>
                       </tr>
                       <tr className="bg-accent text-foreground">
                         {inputHeaders.map(header => (
                           <th
                             key={header}
-                            className="p-1.5 border font-xs text-center whitespace-nowrap sticky top-8 z-10 bg-accent"
+                            className="p-1.5 border text-xs text-center whitespace-nowrap sticky top-8 z-10 bg-accent"
                           >
                             {header.split(" ")[0]}<br />{header.split(" ")[1] || ""}
                           </th>
@@ -1292,7 +1307,7 @@ const IntakeOutputView = () => {
                         {outputHeaders.map(header => (
                           <th
                             key={header}
-                            className="p-1.5 border font-xs text-center whitespace-nowrap sticky top-8 z-10 bg-accent"
+                            className="p-1.5 border text-xs text-center whitespace-nowrap sticky top-8 z-10 bg-accent"
                           >
                             {header}
                           </th>
@@ -1306,7 +1321,7 @@ const IntakeOutputView = () => {
                           className={`${index % 2 === 0 ? 'bg-muted/30' : ''} hover:bg-muted/50`}
                         >
                           {inputHeaders.map(header => (
-                            <TableCell key={`input-data-${header}-${rowNum}`} className="p-1.5 border text-center font-xs h-8">-</TableCell>
+                            <TableCell key={`input-data-${header}-${rowNum}`} className="p-1.5 border text-center text-xs h-8">-</TableCell>
                           ))}
                           {outputHeaders.map(header => (
                             <TableCell key={`output-data-${header}-${rowNum}`} className="p-1.5 border text-center h-8">-</TableCell>
@@ -1367,7 +1382,7 @@ const IntakeOutputView = () => {
       </div>
       <div className="w-1/2 flex flex-col border rounded-md bg-card shadow">
         <div className="flex items-center p-2 border-b bg-card text-foreground rounded-t-md">
-          <h2 className="text-base font-semibold">Intake/Output Graph</h2>
+          <h2 className="text-base">Intake/Output Graph</h2>
         </div>
         <div className="flex-1 p-2">
           {loading ? (
@@ -1432,7 +1447,7 @@ const IntakeOutputView = () => {
   );
 };
 
-const ProblemsView = () => {
+const ProblemsView = ({ patient }: { patient?: Patient }) => {
   const [showEntriesValue, setShowEntriesValueState] = useState<string>("10");
   const [searchValue, setSearchValueState] = useState<string>("");
   const [selectedProblem, setSelectedProblem] = useState<Problem | null>(null);
@@ -1440,7 +1455,7 @@ const ProblemsView = () => {
   const [isPopupOpen, setIsPopupOpen] = useState<boolean>(false);
   
   // Use the patient's SSN or a default one
-  const { problems, loading, error } = usePatientProblems('670230065');
+  const { problems, loading, error } = usePatientProblems(patient?.ssn);
   
   const tableHeaders = ["S.No", "Problem", "Type", "Date", "Status", "Actions"];
   
@@ -1527,7 +1542,7 @@ const ProblemsView = () => {
               <TableHeader className="bg-accent text-foreground sticky top-0 z-10">
                 <TableRow>
                   {tableHeaders.map((header) => (
-                    <TableHead key={header} className="py-2 px-3 font-semibold h-8 whitespace-nowrap text-foreground">
+                    <TableHead key={header} className="py-2 px-3 text-xs h-8 whitespace-nowrap text-foreground">
                       <div className="flex items-center justify-between">
                         {header}
                         <ArrowUpDown className="h-3 w-3 ml-1 text-muted-foreground hover:text-foreground cursor-pointer" />
@@ -1692,14 +1707,14 @@ const ProblemsView = () => {
   );
 };
 
-const FinalDiagnosisView = () => {
+const FinalDiagnosisView = ({ patient }: { patient?: Patient }) => {
   const [showEntriesValue, setShowEntriesValueState] = useState<string>("10");
   const [visitDateValue, setVisitDateValueState] = useState<string>("10 SEP, 2024 13:10");
   const [searchValue, setSearchValueState] = useState<string>("");
   const [selectedDiagnosis, setSelectedDiagnosis] = useState<Record<string, string>>({});
   
   // Use the patient's SSN or a default one
-  const { diagnosis, loading, error, refresh } = usePatientDiagnosis('670768354');
+  const { diagnosis, loading, error, refresh } = usePatientDiagnosis(patient?.ssn);
   
   // Debug logs
   useEffect(() => {
@@ -1723,7 +1738,7 @@ const FinalDiagnosisView = () => {
   return (
     <Card className="flex-1 flex flex-col shadow text-xs overflow-hidden">
       <CardHeader className="p-2.5 border-b bg-card text-foreground rounded-t-md">
-        <CardTitle className="text-base font-semibold">Diagnosis</CardTitle>
+        <CardTitle className="text-base">Diagnosis</CardTitle>
       </CardHeader>
       <CardContent className="p-1 flex-1 flex flex-col overflow-hidden">
         <div className="flex flex-wrap items-center justify-between p-2 border-b gap-y-2 mb-2">
@@ -1770,7 +1785,7 @@ const FinalDiagnosisView = () => {
               <TableHeader className="bg-accent text-foreground sticky top-0 z-10">
                 <TableRow>
                   {tableHeaders.map(header => (
-                    <TableHead key={header} className="py-2 px-3 font-semibold h-8 whitespace-nowrap text-foreground">
+                    <TableHead key={header} className="py-2 px-3 text-xs h-8 whitespace-nowrap text-foreground">
                       <div className="flex items-center justify-between">
                         {header}
                         <ArrowUpDown className="h-3 w-3 ml-1 text-muted-foreground hover:text-foreground cursor-pointer" />
@@ -1863,11 +1878,11 @@ const FinalDiagnosisView = () => {
   );
 };
 
-const ChiefComplaintsView = () => {
+const ChiefComplaintsView = ({ patient }: { patient?: Patient }) => {
   const [showEntriesValue, setShowEntriesValueState] = useState<string>("10");
   const [searchValue, setSearchValueState] = useState<string>("");
   const [isPopupOpen, setIsPopupOpen] = useState<boolean>(false);
-  const { complaints, loading, error, refresh } = usePatientComplaints('670768354');
+  const { complaints, loading, error, refresh } = usePatientComplaints(patient?.ssn);
   
   const tableHeaders = ["S.No", "Complaint", "Type", "Date/Time", "Status", "Remarks"];
 
@@ -1880,7 +1895,7 @@ const ChiefComplaintsView = () => {
     <Card className="flex-1 flex flex-col shadow text-xs overflow-hidden">
       <CardHeader className="p-2.5 border-b bg-card text-foreground rounded-t-md">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold">Chief Complaints</CardTitle>
+          <CardTitle className="text-base">Chief Complaints</CardTitle>
           <div className="flex space-x-1">
             <Button 
               variant="ghost" 
@@ -1937,7 +1952,7 @@ const ChiefComplaintsView = () => {
               <TableHeader className="bg-accent text-foreground sticky top-0 z-10">
                 <TableRow>
                   {tableHeaders.map(header => (
-                    <TableHead key={header} className="py-2 px-3 font-semibold h-8 whitespace-nowrap text-foreground">
+                    <TableHead key={header} className="py-2 px-3 text-xs h-8 whitespace-nowrap text-foreground">
                   <div className="flex items-center justify-between">
                     {header}
                     <ArrowUpDown className="h-3 w-3 ml-1 text-muted-foreground hover:text-foreground cursor-pointer" />
@@ -2052,11 +2067,11 @@ const ChiefComplaintsView = () => {
   );
 };
 
-const AllergiesView = () => {
+const AllergiesView = ({ patient }: { patient?: Patient }) => {
   const [showEntriesValue, setShowEntriesValueState] = useState<string>("10");
   const [searchValue, setSearchValueState] = useState<string>("");
   const [selectedAllergies, setSelectedAllergies] = useState<Record<string, boolean>>({});
-  const { allergies, loading, error, refresh } = usePatientAllergies('670768354');
+  const { allergies, loading, error, refresh } = usePatientAllergies(patient?.ssn);
 
   // Debug logs
   useEffect(() => {
@@ -2078,7 +2093,7 @@ const AllergiesView = () => {
     <Card className="flex-1 flex flex-col shadow text-xs overflow-hidden">
       <CardHeader className="p-2.5 border-b bg-card text-foreground rounded-t-md">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold">Allergies</CardTitle>
+          <CardTitle className="text-base">Allergies</CardTitle>
           <Button 
             variant="ghost" 
             size="icon" 
@@ -2127,7 +2142,7 @@ const AllergiesView = () => {
                   {tableHeaders.map(header => (
                     <TableHead 
                       key={header} 
-                      className={`py-2 px-3 font-semibold h-8 whitespace-nowrap text-foreground ${
+                      className={`py-2 px-3 text-xs h-8 whitespace-nowrap text-foreground ${
                         header === 'Actions' ? 'text-center' : ''
                       }`}
                     >
@@ -2215,7 +2230,7 @@ const AllergiesView = () => {
   );
 };
 
-const OpdIpdDetailsView = () => {
+const OpdIpdDetailsView = ({ patient }: { patient?: Patient }) => {
   const [showEntriesValue, setShowEntriesValueState] = useState<string>("10");
   const [visitDateValue, setVisitDateValueState] = useState<string>("10 SEP, 2024 13:10");
   const [statusSwitchChecked, setStatusSwitchCheckedState] = useState<boolean>(true);
@@ -2227,7 +2242,7 @@ const OpdIpdDetailsView = () => {
     <Card className="flex-1 flex flex-col shadow text-xs overflow-hidden">
       <CardHeader className="p-2.5 border-b bg-card text-foreground rounded-t-md">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold">OPD/IPD Details</CardTitle>
+          <CardTitle className="text-base">OPD/IPD Details</CardTitle>
           <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-muted/50">
             <Edit3 className="h-4 w-4" />
           </Button>
@@ -2275,7 +2290,7 @@ const OpdIpdDetailsView = () => {
               <TableHeader className="bg-accent text-foreground sticky top-0 z-10">
                 <TableRow>
                   {tableHeaders.map(header => (
-                    <TableHead key={header} className="py-2 px-3 font-semibold h-8 whitespace-nowrap text-foreground">
+                    <TableHead key={header} className="py-2 px-3 text-xs h-8 whitespace-nowrap text-foreground">
                       <div className="flex items-center justify-between">
                         {header}
                         <ArrowUpDown className="h-3 w-3 ml-1 text-muted-foreground hover:text-foreground cursor-pointer" />
@@ -2310,6 +2325,9 @@ const OpdIpdDetailsView = () => {
 const VitalsDashboardPage: NextPage<{ patient?: Patient }> = ({ patient }) => {
   const [activeVerticalTab, setActiveVerticalTab] = useState<string>(verticalNavItems[0]);
 
+  // Add a default patient object if not provided
+  const currentPatient = patient || { ssn: '' };
+
   return (
     <div className="flex flex-col h-[calc(100vh-var(--top-nav-height,60px))] bg-background text-sm px-3 pb-3 pt-0">
       <div className="flex items-end space-x-1 px-1 pb-0 pt-1 overflow-x-auto no-scrollbar">
@@ -2328,13 +2346,13 @@ const VitalsDashboardPage: NextPage<{ patient?: Patient }> = ({ patient }) => {
         ))}
       </div>
       <main className="flex-1 flex flex-col gap-3 overflow-hidden">
-        {activeVerticalTab === "Vitals" && <VitalsView />}
-        {activeVerticalTab === "Intake/Output" && <IntakeOutputView />}
-        {activeVerticalTab === "Problems" && <ProblemsView />}
-        {activeVerticalTab === "Final Diagnosis" && <FinalDiagnosisView />}
-        {activeVerticalTab === "Chief-Complaints" && <ChiefComplaintsView />}
-        {activeVerticalTab === "Allergies" && <AllergiesView />}
-        {activeVerticalTab === "OPD/IPD Details" && <OpdIpdDetailsView />}
+        {activeVerticalTab === "Vitals" && <VitalsView patient={currentPatient} />}
+        {activeVerticalTab === "Intake/Output" && <IntakeOutputView patient={currentPatient} />}
+        {activeVerticalTab === "Problems" && <ProblemsView patient={currentPatient} />}
+        {activeVerticalTab === "Final Diagnosis" && <FinalDiagnosisView patient={currentPatient} />}
+        {activeVerticalTab === "Chief-Complaints" && <ChiefComplaintsView patient={currentPatient} />}
+        {activeVerticalTab === "Allergies" && <AllergiesView patient={currentPatient} />}
+        {activeVerticalTab === "OPD/IPD Details" && <OpdIpdDetailsView patient={currentPatient} />}
         {![
           "Vitals", "Intake/Output", "Problems", "Final Diagnosis",
           "Chief-Complaints", "Allergies", "OPD/IPD Details"

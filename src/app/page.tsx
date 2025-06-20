@@ -127,7 +127,7 @@ export default function DashboardPage({
   }>>({});
 
   // Fetch up-to-date problems for the patient (fallback to provided problems until fetch completes)
-  const effectiveSSN = patient.ssn && patient.ssn.trim() !== '' ? patient.ssn : '670230065';
+  const effectiveSSN = patient.ssn || '670230065';
   const { problems: fetchedProblems } = usePatientProblems(effectiveSSN);
   const { allergies: fetchedAllergies, loading: allergiesLoading } = usePatientAllergies(effectiveSSN);
   const { notes: clinicalNotes, loading: clinicalNotesLoading } = useClinicalNotes(effectiveSSN);
@@ -471,47 +471,97 @@ export default function DashboardPage({
     setSelectedRows((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  // Handle adding new entries
-  const handleAddProblem = (dialogId: string) => {
+  const handleAddProblem = async (dialogId: string) => {
     const input = problemInputs[dialogId];
-    if (!input?.input?.trim()) {
-      toast.error('Please enter a problem description');
+    if (!input) {
+      toast.error('Problem input not found');
       return;
     }
 
-    const newProblem: Problem = {
-      id: `problem-${Date.now()}`,
-      description: input.input,
-      category: input.category || 'Other',
-      status: (input.status || 'ACTIVE') as ProblemStatus,
-      dateOnset: input.dateOnset || new Date().toISOString(),
-      service: input.service as ProblemService,
-      notes: input.comment
-    };
+    // Check if either preferred problems are selected or other problem is entered
+    const hasPreferredProblems = input.preferred && input.preferred.length > 0;
+    const hasOtherProblem = input.other && input.input?.trim();
+    
+    if (!hasPreferredProblems && !hasOtherProblem) {
+      toast.error('Please select at least one problem or enter a custom problem');
+      return;
+    }
 
-    // Add the new problem to local state with proper type
-    console.log('New problem to be added:', newProblem);
-    
-    // Reset the form
-    setProblemInputs(prev => ({
-      ...prev,
-      [dialogId]: {
-        input: '',
-        category: '',
-        other: false,
-        preferred: [],
-        status: '',
-        immediacy: '',
-        dateOnset: '',
-        service: '',
-        comment: ''
+    try {
+      // Prepare the request body
+      const requestBody = {
+        PatientSSN: patient?.ssn || '', // Use the patient's SSN from props
+        Problem: hasOtherProblem ? input.input : input.preferred?.join(', '),
+        Status: input.status || 'ACTIVE',
+        DateOfOnset: input.dateOnset || new Date().toISOString().split('T')[0],
+        Service: input.service || 'GENERAL',
+        Immediacy: input.immediacy || 'UNKNOWN',
+        Comment: input.comment || '',
+        DUZ: '115',
+        // Include both preferred and other fields for the API
+        preferred: hasPreferredProblems ? input.preferred : [],
+        other: hasOtherProblem ? input.input : ''
+      };
+
+      console.log('Sending request to /api/problems/save:', requestBody);
+
+      const response = await fetch('/api/problems/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        throw new Error(`Unexpected response format: ${text.substring(0, 100)}...`);
       }
-    }));
-    
-    // Close the dialog
-    closeFloatingDialog(dialogId);
-    
-    toast.success('Problem added successfully');
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error('API Error:', result);
+        throw new Error(result.error || `Request failed with status ${response.status}`);
+      }
+
+      console.log('API Response:', result);
+
+      if (result.success || result.Success) {
+        // Reset the form
+        setProblemInputs(prev => ({
+          ...prev,
+          [dialogId]: {
+            input: '',
+            category: '',
+            other: false,
+            preferred: [],
+            status: '',
+            immediacy: '',
+            dateOnset: '',
+            service: '',
+            comment: ''
+          }
+        }));
+        
+        // Close the dialog
+        closeFloatingDialog(dialogId);
+        
+        // Show success message
+        toast.success('Problem saved successfully');
+        
+        // Refresh problems list or update local state as needed
+        // You might want to add this functionality
+      } else {
+        throw new Error(result.message || result.Message || 'Failed to save problem');
+      }
+    } catch (error) {
+      console.error('Error in handleAddProblem:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save problem';
+      toast.error(errorMessage);
+    }
   };
 
   const handleAddMedication = (dialogId: string) => {
@@ -1160,17 +1210,29 @@ export default function DashboardPage({
             </Button>
           </div>
           <div className="p-4">
-            {dialog.type === 'problem' && (
+            {dialog.type === 'problem' ? (
               <div className="flex flex-col gap-3 text-sm">
+                <div className="bg-sky-100 p-3 -m-4 mb-4 text-xs text-sky-700 flex flex-wrap items-center gap-x-6 gap-y-1">
+                  <span>Patient ID: {patient.id}</span>
+                  <span>Name: {patient.name}</span>
+                  <span>Age: {patient.age}</span>
+                  <span>Sex: {patient.gender}</span>
+                  <span>Patient Type: In Patient</span>
+                </div>
+                
                 <div className="flex items-center gap-3">
-                  <Label htmlFor={`problemCategory-${dialog.id}`} className="w-[120px] min-w-[120px] shrink-0">Categories</Label>
+                  <Label htmlFor={`problemCategory-${dialog.id}`} className="w-[120px] min-w-[120px] shrink-0">
+                    Categories
+                  </Label>
                   <div className="flex-1 min-w-0">
                     <Select
                       value={problemInputs[dialog.id]?.category}
-                      onValueChange={(value) => setProblemInputs((prev) => ({
-                        ...prev,
-                        [dialog.id]: { ...prev[dialog.id], category: value as ProblemCategory },
-                      }))}
+                      onValueChange={(value) =>
+                        setProblemInputs((prev) => ({
+                          ...prev,
+                          [dialog.id]: { ...prev[dialog.id], category: value as ProblemCategory },
+                        }))
+                      }
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select Category" />
@@ -1184,11 +1246,13 @@ export default function DashboardPage({
                   <div className="flex items-center space-x-2 ml-2">
                     <Checkbox
                       id={`otherProblems-${dialog.id}`}
-                      checked={problemInputs[dialog.id]?.other}
-                      onCheckedChange={(checked) => setProblemInputs((prev) => ({
-                        ...prev,
-                        [dialog.id]: { ...prev[dialog.id], other: checked as boolean },
-                      }))}
+                      checked={problemInputs[dialog.id]?.other || false}
+                      onCheckedChange={(checked) =>
+                        setProblemInputs((prev) => ({
+                          ...prev,
+                          [dialog.id]: { ...prev[dialog.id], other: checked as boolean },
+                        }))
+                      }
                       className="h-4 w-4"
                     />
                     <Label htmlFor={`otherProblems-${dialog.id}`} className="text-sm whitespace-nowrap">
@@ -1197,401 +1261,438 @@ export default function DashboardPage({
                   </div>
                 </div>
 
-                {/* Other Problems Input - Only shown when checked */}
-                {problemInputs[dialog.id]?.other ? (
-                  <div className="flex items-center gap-3 mt-2">
-                    <Label htmlFor={`otherProblemInput-${dialog.id}`} className="w-[120px] min-w-[120px] shrink-0">
-                      Problem Description
+                {/* Problem description input - shown when 'Other Problems' is checked */}
+                {problemInputs[dialog.id]?.other && (
+                  <div className="flex items-center gap-3">
+                    <Label htmlFor={`problemInput-${dialog.id}`} className="w-[120px] min-w-[120px] shrink-0">
+                      Problem
                     </Label>
                     <Input
-                      id={`otherProblemInput-${dialog.id}`}
+                      id={`problemInput-${dialog.id}`}
                       value={problemInputs[dialog.id]?.input || ''}
-                      onChange={(e) => setProblemInputs((prev) => ({
-                        ...prev,
-                        [dialog.id]: { ...prev[dialog.id], input: e.target.value },
-                      }))}
+                      onChange={(e) =>
+                        setProblemInputs((prev) => ({
+                          ...prev,
+                          [dialog.id]: { ...prev[dialog.id], input: e.target.value },
+                        }))
+                      }
                       placeholder="Enter problem description"
                       className="flex-1"
                     />
                   </div>
-                ) : (
-                  <div className="flex gap-3">
-                    <Label className="w-[120px] min-w-[120px]">Preferred Problems</Label>
-                    <div className="grid grid-cols-2 gap-2 flex-1 max-h-40 overflow-y-auto">
-                      {[
-                        'Anemia (D64.9)', 'Diabetes (E11.9)', 'Dehydration (E86.0)', 'Confusion (F29.)', 'Depression (F32.9)',
-                        'Double vision (H53.2)', 'Blurred Vision (H53.8)', 'Defective Vision (H54.7)', 'Eye Pain (H57.13)',
-                        'Ear Pain (H60.9)', 'Fever (R50.9)',
-                      ].map((problem, index) => (
-                        <div key={index} className="flex items-center space-x-2 text-sm">
-                          <Checkbox
-                            id={`preferred-${dialog.id}-${index}`}
-                            checked={problemInputs[dialog.id]?.preferred.includes(problem)}
-                            onCheckedChange={(checked) => setProblemInputs((prev) => ({
-                              ...prev,
-                              [dialog.id]: {
-                                ...prev[dialog.id],
-                                preferred: checked
-                                  ? [...prev[dialog.id].preferred, problem]
-                                  : prev[dialog.id].preferred.filter((p) => p !== problem),
-                              },
-                            }))}
-                          />
-                          <Label htmlFor={`preferred-${dialog.id}-${index}`}>{problem}</Label>
-                        </div>
-                      ))}
-                    </div>
+                )}
+
+                {/* Preferred problems grid - shown when 'Other Problems' is not checked */}
+                {!problemInputs[dialog.id]?.other && (
+                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border rounded">
+                    {[
+                      'Fever', 'Headache', 'Cough', 'Fatigue', 'Nausea',
+                      'Dizziness', 'Shortness of breath', 'Chest pain'
+                    ].map((problem) => (
+                      <div key={problem} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`${problem}-${dialog.id}`}
+                          checked={problemInputs[dialog.id]?.preferred?.includes(problem) || false}
+                          onCheckedChange={(checked) => {
+                            setProblemInputs((prev) => {
+                              const current = prev[dialog.id] || {};
+                              const preferred = [...(current.preferred || [])];
+                              
+                              if (checked) {
+                                preferred.push(problem);
+                              } else {
+                                const index = preferred.indexOf(problem);
+                                if (index > -1) {
+                                  preferred.splice(index, 1);
+                                }
+                              }
+                              
+                              return {
+                                ...prev,
+                                [dialog.id]: {
+                                  ...current,
+                                  preferred,
+                                  input: checked ? problem : (current.input === problem ? '' : current.input)
+                                },
+                              };
+                            });
+                          }}
+                        />
+                        <Label htmlFor={`${problem}-${dialog.id}`} className="text-sm">
+                          {problem}
+                        </Label>
+                      </div>
+                    ))}
                   </div>
                 )}
+
                 <div className="flex items-center gap-3">
                   <div className="w-1/2 flex items-center gap-3">
-                    <Label htmlFor={`problemStatus-${dialog.id}`} className="w-[120px] min-w-[120px]">Status</Label>
+                    <Label htmlFor={`problemStatus-${dialog.id}`} className="w-[120px] min-w-[120px] shrink-0">
+                      Status
+                    </Label>
                     <Select
                       value={problemInputs[dialog.id]?.status}
-                      onValueChange={(value) => setProblemInputs((prev) => ({
-                        ...prev,
-                        [dialog.id]: { ...prev[dialog.id], status: value as ProblemStatus },
-                      }))}
+                      onValueChange={(value) =>
+                        setProblemInputs((prev) => ({
+                          ...prev,
+                          [dialog.id]: { ...prev[dialog.id], status: value as ProblemStatus },
+                        }))
+                      }
                     >
                       <SelectTrigger className="flex-1">
                         <SelectValue placeholder="Select Status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ACTIVE">ACTIVE</SelectItem>
-                        <SelectItem value="RESOLVED">RESOLVED</SelectItem>
+                        <SelectItem value="ACTIVE">Active</SelectItem>
+                        <SelectItem value="RESOLVED">Resolved</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="w-1/2 flex items-center gap-3">
-                    <Label className="w-[120px] min-w-[120px]">Immediacy</Label>
+                    <Label className="w-[120px] min-w-[120px] shrink-0">Immediacy</Label>
                     <RadioGroup
-                      value={problemInputs[dialog.id]?.immediacy}
-                      onValueChange={(value) => setProblemInputs((prev) => ({
-                        ...prev,
-                        [dialog.id]: { ...prev[dialog.id], immediacy: value as ProblemImmediacy },
-                      }))}
-                      className="flex items-center gap-2"
+                      value={problemInputs[dialog.id]?.immediacy || ''}
+                      onValueChange={(value) =>
+                        setProblemInputs((prev) => ({
+                          ...prev,
+                          [dialog.id]: { ...prev[dialog.id], immediacy: value as ProblemImmediacy },
+                        }))
+                      }
+                      className="flex items-center gap-4"
                     >
-                      <div className="flex items-center space-x-1">
-                        <RadioGroupItem value="Unknown" id={`immediacy-unknown-${dialog.id}`} />
-                        <Label htmlFor={`immediacy-unknown-${dialog.id}`} className="text-xs">Unknown</Label>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="ACUTE" id={`immediacy-acute-${dialog.id}`} />
+                        <Label htmlFor={`immediacy-acute-${dialog.id}`} className="text-sm">Acute</Label>
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <RadioGroupItem value="Acute" id={`immediacy-acute-${dialog.id}`} />
-                        <Label htmlFor={`immediacy-acute-${dialog.id}`} className="text-xs">Acute</Label>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <RadioGroupItem value="Chronic" id={`immediacy-chronic-${dialog.id}`} />
-                        <Label htmlFor={`immediacy-chronic-${dialog.id}`} className="text-xs">Chronic</Label>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="CHRONIC" id={`immediacy-chronic-${dialog.id}`} />
+                        <Label htmlFor={`immediacy-chronic-${dialog.id}`} className="text-sm">Chronic</Label>
                       </div>
                     </RadioGroup>
                   </div>
                 </div>
+
                 <div className="flex items-center gap-3">
-                  <Label htmlFor={`dateOnset-${dialog.id}`} className="w-[120px] min-w-[120px]">Date of Onset</Label>
+                  <Label htmlFor={`dateOnset-${dialog.id}`} className="w-[120px] min-w-[120px] shrink-0">
+                    Date of Onset
+                  </Label>
                   <Input
                     id={`dateOnset-${dialog.id}`}
                     type="date"
-                    value={problemInputs[dialog.id]?.dateOnset}
-                    onChange={(e) => setProblemInputs((prev) => ({
-                      ...prev,
-                      [dialog.id]: { ...prev[dialog.id], dateOnset: e.target.value },
-                    }))}
+                    value={problemInputs[dialog.id]?.dateOnset || ''}
+                    onChange={(e) =>
+                      setProblemInputs((prev) => ({
+                        ...prev,
+                        [dialog.id]: { ...prev[dialog.id], dateOnset: e.target.value },
+                      }))
+                    }
                     className="flex-1"
                   />
-                  <Label htmlFor={`problemService-${dialog.id}`} className="w-[120px] min-w-[120px] text-left">Service</Label>
+                  <Label htmlFor={`problemService-${dialog.id}`} className="w-[120px] min-w-[120px] shrink-0">
+                    Service
+                  </Label>
                   <Select
                     value={problemInputs[dialog.id]?.service}
-                    onValueChange={(value) => setProblemInputs((prev) => ({
-                      ...prev,
-                      [dialog.id]: { ...prev[dialog.id], service: value },
-                    }))}
+                    onValueChange={(value) =>
+                      setProblemInputs((prev) => ({
+                        ...prev,
+                        [dialog.id]: { ...prev[dialog.id], service: value },
+                      }))
+                    }
                   >
                     <SelectTrigger className="flex-1">
                       <SelectValue placeholder="Select Service" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Cardiology">Cardiology</SelectItem>
-                      <SelectItem value="General Medicine">General Medicine</SelectItem>
-                      <SelectItem value="Endocrinology">Endocrinology</SelectItem>
-                      <SelectItem value="Orthopedics">Orthopedics</SelectItem>
+                      <SelectItem value="CARDIOLOGY">Cardiology</SelectItem>
+                      <SelectItem value="NEUROLOGY">Neurology</SelectItem>
+                      <SelectItem value="ORTHOPEDICS">Orthopedics</SelectItem>
+                      <SelectItem value="GENERAL">General</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex flex-col gap-3">
-                  <Label htmlFor={`problemComment-${dialog.id}`} className="w-[120px] min-w-[120px]">Comment</Label>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor={`problemComment-${dialog.id}`} className="w-full">
+                    Comment
+                  </Label>
                   <Textarea
                     id={`problemComment-${dialog.id}`}
-                    value={problemInputs[dialog.id]?.comment}
-                    onChange={(e) => setProblemInputs((prev) => ({
-                      ...prev,
-                      [dialog.id]: { ...prev[dialog.id], comment: e.target.value },
-                    }))}
-                    className="h-24"
+                    value={problemInputs[dialog.id]?.comment || ''}
+                    onChange={(e) =>
+                      setProblemInputs((prev) => ({
+                        ...prev,
+                        [dialog.id]: { ...prev[dialog.id], comment: e.target.value },
+                      }))
+                    }
+                    placeholder="Add any additional comments..."
+                    className="w-full min-h-[80px]"
                   />
                 </div>
+
                 <div className="flex justify-end gap-2 mt-4">
                   <Button onClick={() => handleAddProblem(dialog.id)}>Create</Button>
                   <Button
-                    variant="secondary"
-                    onClick={() => setProblemInputs(prev => ({
-                      ...prev,
-                      [dialog.id]: {
-                        input: '',
-                        category: '',
-                        other: false,
-                        preferred: [],
-                        status: '',
-                        immediacy: '',
-                        dateOnset: '',
-                        service: '',
-                        comment: ''
-                      }
-                    }))}
+                    variant="outline"
+                    onClick={() => {
+                      setProblemInputs((prev) => ({
+                        ...prev,
+                        [dialog.id]: {
+                          input: '',
+                          category: '',
+                          other: false,
+                          preferred: [],
+                          status: '',
+                          immediacy: '',
+                          dateOnset: '',
+                          service: '',
+                          comment: '',
+                        },
+                      }));
+                    }}
                   >
                     Reset
                   </Button>
-                  <Button variant="outline" onClick={() => closeFloatingDialog(dialog.id)}>Cancel</Button>
+                  <Button variant="outline" onClick={() => closeFloatingDialog(dialog.id)}>
+                    Cancel
+                  </Button>
                 </div>
               </div>
-            )}
-            {dialog.type === 'medication' && (
-              <Dialog open={true} onOpenChange={() => closeFloatingDialog(dialog.id)}>
-                <DialogContent className="sm:max-w-4xl p-0">
-                  <div className="bg-sky-100 p-3 text-xs text-sky-700 flex flex-wrap items-center gap-x-6 gap-y-1">
-                    <span>Patient ID: 80000035</span>
-                    <span>Name: Anonymous Two</span>
-                    <span>Age: 69 Years</span>
-                    <span>Sex: MALE</span>
-                    <span>Patient Type: In Patient</span>
-                  </div>
-                  <div className="p-4 flex gap-4 items-end">
-                    <div className="flex-1 relative">
-                      <label className="block text-sm font-medium">Medication Name</label>
-                      <Input
-                        value={medSearch}
-                        onChange={(e) => {
-                          setMedSearch(e.target.value);
-                          setDropdownOpen(true);
-                          setFilteredMeds(
-                            MEDICATIONS.filter((med) =>
-                              med.toLowerCase().includes(e.target.value.toLowerCase())
-                            )
-                          );
-                        }}
-                        onFocus={() => setDropdownOpen(true)}
-                        onBlur={() => setTimeout(() => setDropdownOpen(false), 120)}
-                        className="w-full"
-                        placeholder="Type to search..."
-                        autoComplete="off"
-                      />
-                      {dropdownOpen && medSearch && (
-                        <div className="border rounded bg-white max-h-48 overflow-y-auto absolute z-20 w-full">
-                          {filteredMeds.length === 0 ? (
-                            <div className="p-2 text-muted-foreground">No medication found.</div>
-                          ) : (
-                            filteredMeds.map((med) => (
-                              <div
-                                key={med}
-                                className="p-2 hover:bg-sky-100 cursor-pointer"
-                                onMouseDown={() => handleSelectMed(med)}
-                              >
-                                {med}
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium">Quick Order</label>
-                      <Input
-                        value={quickOrder}
-                        onChange={(e) => setQuickOrder(e.target.value)}
-                        className="w-full"
-                        placeholder=""
-                      />
-                    </div>
-                    <Button type="button" className="bg-yellow-500 hover:bg-yellow-600 text-white h-9 text-xs">
-                      Edit Quick List
-                    </Button>
-                  </div>
-                  {selectedRows.length > 0 && (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full mt-2 border">
-                        <thead className="bg-sky-100 text-xs font-light " >
-                          <tr>
-                            <th className="px-2 py-1">Medicine Name</th>
-                            <th className="px-2 py-1">Dosage</th>
-                            <th className="px-2 py-1">Route</th>
-                            <th className="px-2 py-1">Schedule</th>
-                            <th className="px-2 py-1">PRN</th>
-                            <th className="px-2 py-1">Duration</th>
-                            <th className="px-2 py-1">Priority</th>
-                            <th className="px-2 py-1">Additional Dose Now</th>
-                            <th className="px-2 py-1">Comment</th>
-                            <th className="px-2 py-1">Remove</th>
-                            <th className="px-2 py-1">Save Quick Order</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedRows.map((row, idx) => (
-                            <tr key={row.medicationName}>
-                              <td className="px-2 py-1">{row.medicationName}</td>
-                              <td className="px-2 py-1">
-                                <Input
-                                  value={row.dosage}
-                                  onChange={(e) => handleRowChange(idx, 'dosage', e.target.value)}
-                                  className="w-20"
-                                />
-                              </td>
-                              <td className="px-2 py-1">
-                                <Select
-                                  value={row.route}
-                                  onValueChange={(val) => handleRowChange(idx, 'route', val)}
-                                >
-                                  <SelectTrigger className="w-24 h-8">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {ROUTES.map((route) => (
-                                      <SelectItem value={route} key={route}>
-                                        {route}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </td>
-                              <td className="px-2 py-1">
-                                <Select
-                                  value={row.schedule}
-                                  onValueChange={(val) => handleRowChange(idx, 'schedule', val)}
-                                >
-                                  <SelectTrigger className="w-24 h-8">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {SCHEDULES.map((schedule) => (
-                                      <SelectItem value={schedule} key={schedule}>
-                                        {schedule}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </td>
-                              <td className="px-2 py-1 text-center">
-                                <Checkbox
-                                  checked={row.prn}
-                                  onCheckedChange={(val) => handleRowChange(idx, 'prn', val)}
-                                />
-                              </td>
-                              <td className="px-2 py-1 flex items-center">
-                                <Input
-                                  type="number"
-                                  value={row.duration}
-                                  onChange={(e) => handleRowChange(idx, 'duration', e.target.value)}
-                                  className="w-12"
-                                />
-                                <Select
-                                  value={row.durationUnit}
-                                  onValueChange={(val) => handleRowChange(idx, 'durationUnit', val)}
-                                >
-                                  <SelectTrigger className="w-16 h-8 ml-1">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="days">days</SelectItem>
-                                    <SelectItem value="weeks">weeks</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </td>
-                              <td className="px-2 py-1">
-                                <Select
-                                  value={row.priority}
-                                  onValueChange={(val) => handleRowChange(idx, 'priority', val)}
-                                >
-                                  <SelectTrigger className="w-24 h-8">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {PRIORITIES.map((priority) => (
-                                      <SelectItem value={priority} key={priority}>
-                                        {priority}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </td>
-                              <td className="px-2 py-1 text-center">
-                                <Checkbox
-                                  checked={row.additionalDoseNow}
-                                  onCheckedChange={(val) => handleRowChange(idx, 'additionalDoseNow', val)}
-                                />
-                              </td>
-                              <td className="px-2 py-1">
-                                <Input
-                                  value={row.comment}
-                                  onChange={(e) => handleRowChange(idx, 'comment', e.target.value)}
-                                  className="w-28"
-                                />
-                              </td>
-                              <td className="px-2 py-1 text-center">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleRemoveRow(idx)}
-                                >
-                                  ❌
-                                </Button>
-                              </td>
-                              <td className="px-2 py-1 text-center">
-                                <Button variant="ghost" size="icon">
-                                  💾
-                                </Button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  <div className="flex justify-end gap-2 p-4">
-                    <Button
-                      onClick={() => {
-                        selectedRows.forEach((row) => {
-                          const newMed: Medication = {
-                            id: Date.now().toString(),
-                            name: row.medicationName,
-                            reason: row.comment || 'General',
-                            amount: row.dosage || 'N/A',
-                            timing: row.schedule || 'N/A',
-                            status: 'Active',
-                          };
-                          setLocalMedications((prev: Medication[]) => [newMed, ...prev]);
-                        });
-                        toast.success('Medications added successfully!');
-                        closeFloatingDialog(dialog.id);
+            ) : dialog.type === 'medication' ? (
+              <div className="flex flex-col gap-4 text-sm">
+                <div className="grid grid-cols-2 gap-4">
+                  <div><span className="font-semibold">Patient ID:</span> 800000035</div>
+                  <div><span className="font-semibold">Name:</span> Anonymous Two</div>
+                  <div><span className="font-semibold">Age:</span> 69 Years</div>
+                  <div><span className="font-semibold">Sex:</span> MALE</div>
+                  <div className="md:col-span-2"><span className="font-semibold">Patient Type:</span> In Patient</div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <Label className="font-medium">Medication Name</Label>
+                    <Input
+                      value={medSearch}
+                      onChange={(e) => {
+                        setMedSearch(e.target.value);
+                        setDropdownOpen(true);
+                        setFilteredMeds(
+                          MEDICATIONS.filter((med) =>
+                            med.toLowerCase().includes(e.target.value.toLowerCase())
+                          )
+                        );
                       }}
-                    >
-                      Confirm Order
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => setSelectedRows([])}
-                    >
-                      Reset
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => closeFloatingDialog(dialog.id)}
-                    >
-                      Cancel
-                    </Button>
+                      onFocus={() => setDropdownOpen(true)}
+                      onBlur={() => setTimeout(() => setDropdownOpen(false), 120)}
+                      className="w-full"
+                      placeholder="Type to search..."
+                      autoComplete="off"
+                    />
+                    {dropdownOpen && medSearch && (
+                      <div className="border rounded bg-white max-h-48 overflow-y-auto absolute z-20 w-full">
+                        {filteredMeds.length === 0 ? (
+                          <div className="p-2 text-muted-foreground">No medication found.</div>
+                        ) : (
+                          filteredMeds.map((med) => (
+                            <div
+                              key={med}
+                              className="p-2 hover:bg-sky-100 cursor-pointer"
+                              onMouseDown={() => handleSelectMed(med)}
+                            >
+                              {med}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </div>
-                </DialogContent>
-              </Dialog>
-            )}
-            {dialog.type === 'radiology' && (
+                  <div className="flex flex-col gap-2">
+                    <Label className="font-medium">Quick Order</Label>
+                    <Input
+                      value={quickOrder}
+                      onChange={(e) => setQuickOrder(e.target.value)}
+                      className="w-full"
+                      placeholder=""
+                    />
+                  </div>
+                  <Button type="button" className="bg-yellow-500 hover:bg-yellow-600 text-white h-9 text-xs">
+                    Edit Quick List
+                  </Button>
+                </div>
+                {selectedRows.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full mt-2 border">
+                      <thead className="bg-sky-100 text-xs font-light " >
+                        <tr>
+                          <th className="px-2 py-1">Medicine Name</th>
+                          <th className="px-2 py-1">Dosage</th>
+                          <th className="px-2 py-1">Route</th>
+                          <th className="px-2 py-1">Schedule</th>
+                          <th className="px-2 py-1">PRN</th>
+                          <th className="px-2 py-1">Duration</th>
+                          <th className="px-2 py-1">Priority</th>
+                          <th className="px-2 py-1">Additional Dose Now</th>
+                          <th className="px-2 py-1">Comment</th>
+                          <th className="px-2 py-1">Remove</th>
+                          <th className="px-2 py-1">Save Quick Order</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedRows.map((row, idx) => (
+                          <tr key={row.medicationName}>
+                            <td className="px-2 py-1">{row.medicationName}</td>
+                            <td className="px-2 py-1">
+                              <Input
+                                value={row.dosage}
+                                onChange={(e) => handleRowChange(idx, 'dosage', e.target.value)}
+                                className="w-20"
+                              />
+                            </td>
+                            <td className="px-2 py-1">
+                              <Select
+                                value={row.route}
+                                onValueChange={(val) => handleRowChange(idx, 'route', val)}
+                              >
+                                <SelectTrigger className="w-24 h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {ROUTES.map((route) => (
+                                    <SelectItem value={route} key={route}>
+                                      {route}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="px-2 py-1">
+                              <Select
+                                value={row.schedule}
+                                onValueChange={(val) => handleRowChange(idx, 'schedule', val)}
+                              >
+                                <SelectTrigger className="w-24 h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {SCHEDULES.map((schedule) => (
+                                    <SelectItem value={schedule} key={schedule}>
+                                      {schedule}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="px-2 py-1 text-center">
+                              <Checkbox
+                                checked={row.prn}
+                                onCheckedChange={(val) => handleRowChange(idx, 'prn', val)}
+                              />
+                            </td>
+                            <td className="px-2 py-1 flex items-center">
+                              <Input
+                                type="number"
+                                value={row.duration}
+                                onChange={(e) => handleRowChange(idx, 'duration', e.target.value)}
+                                className="w-12"
+                              />
+                              <Select
+                                value={row.durationUnit}
+                                onValueChange={(val) => handleRowChange(idx, 'durationUnit', val)}
+                              >
+                                <SelectTrigger className="w-16 h-8 ml-1">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="days">days</SelectItem>
+                                  <SelectItem value="weeks">weeks</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="px-2 py-1">
+                              <Select
+                                value={row.priority}
+                                onValueChange={(val) => handleRowChange(idx, 'priority', val)}
+                              >
+                                <SelectTrigger className="w-24 h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {PRIORITIES.map((priority) => (
+                                    <SelectItem value={priority} key={priority}>
+                                      {priority}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="px-2 py-1 text-center">
+                              <Checkbox
+                                checked={row.additionalDoseNow}
+                                onCheckedChange={(val) => handleRowChange(idx, 'additionalDoseNow', val)}
+                              />
+                            </td>
+                            <td className="px-2 py-1">
+                              <Input
+                                value={row.comment}
+                                onChange={(e) => handleRowChange(idx, 'comment', e.target.value)}
+                                className="w-28"
+                              />
+                            </td>
+                            <td className="px-2 py-1 text-center">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveRow(idx)}
+                              >
+                                ❌
+                              </Button>
+                            </td>
+                            <td className="px-2 py-1 text-center">
+                              <Button variant="ghost" size="icon">
+                                💾
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 p-4">
+                  <Button
+                    onClick={() => {
+                      selectedRows.forEach((row) => {
+                        const newMed: Medication = {
+                          id: Date.now().toString(),
+                          name: row.medicationName,
+                          reason: row.comment || 'General',
+                          amount: row.dosage || 'N/A',
+                          timing: row.schedule || 'N/A',
+                          status: 'Active',
+                        };
+                        setLocalMedications((prev: Medication[]) => [newMed, ...prev]);
+                      });
+                      toast.success('Medications added successfully!');
+                      closeFloatingDialog(dialog.id);
+                    }}
+                  >
+                    Confirm Order
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setSelectedRows([])}
+                  >
+                    Reset
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => closeFloatingDialog(dialog.id)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : dialog.type === 'radiology' ? (
               <div className="flex flex-col gap-4 text-sm">
                 <div className="grid grid-cols-2 gap-4">
                   <div><span className="font-semibold">Patient ID:</span> 800000035</div>
@@ -1678,8 +1779,7 @@ export default function DashboardPage({
                   </Button>
                 </div>
               </div>
-            )}
-            {dialog.type === 'report' && (
+            ) : dialog.type === 'report' ? (
               <div className="flex flex-col gap-4 text-sm">
                 <div className="grid grid-cols-2 gap-4">
                   <div><span className="font-semibold">Report Search</span></div>
@@ -1791,8 +1891,7 @@ export default function DashboardPage({
                   </Button>
                 </div>
               </div>
-            )}
-            {dialog.type === 'allergies' && (
+            ) : dialog.type === 'allergies' ? (
               <div className="flex flex-col gap-4 text-sm">
                 {/* Allergies Input */}
                 <div className="grid grid-cols-1 gap-2">
@@ -1917,8 +2016,7 @@ export default function DashboardPage({
                   </Button>
                 </div>
               </div>
-            )}
-            {dialog.type === 'info-item' && (
+            ) : dialog.type === 'info-item' ? (
               <div className="grid gap-4">
                 <div className="grid grid-cols-4 items-center gap-4 text-sm">
                   <Label htmlFor={`itemName-${dialog.id}`} className="text-right">Item</Label>
@@ -1936,6 +2034,10 @@ export default function DashboardPage({
                   <Button onClick={() => handleSaveNewInfoItem(dialog.id)}>Add Item</Button>
                   <Button variant="outline" onClick={() => closeFloatingDialog(dialog.id)}>Cancel</Button>
                 </div>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Unsupported dialog type
               </div>
             )}
           </div>
@@ -1987,10 +2089,6 @@ export default function DashboardPage({
           </div>
         </DialogContent>
       </Dialog>
-
-
-
-
     </div>
   );
 }

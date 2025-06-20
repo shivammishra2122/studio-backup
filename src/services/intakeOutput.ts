@@ -1,13 +1,18 @@
 // src/services/intakeOutput.ts
 export const fetchIntakeUpdateData = async (patientSSN: string): Promise<IntakeOutputSummary> => {
-  const apiUrl = 'http://3.6.230.54:4003/api/apiIntUpList.sh';
+  if (!patientSSN) {
+    throw new Error('Patient SSN is required');
+  }
+
+  const apiUrl = 'http://3.6.230.54:4003/api/apiIntakeOutput.sh';
   const requestBody = {
     UserName: 'CPRS-UAT',
-    Password: 'UAT@123',
-    PatientSSN: patientSSN || '670768354',
-    rioOLRange: '3',
-    rioOlFdat: '',
-    rioOLTodat: ''
+    PatientSSN: patientSSN,
+    DUZ: '115',
+    ihtLocation: 102,
+    FromDate: '',
+    ToDate: '',
+    Action: 'I',
   };
 
   try {
@@ -61,36 +66,20 @@ export const fetchIntakeUpdateData = async (patientSSN: string): Promise<IntakeO
   }
 };
 
-export interface IntakeOutputRecord {
-  id: string;
-  timestamp: string;
-  type: 'INTAKE' | 'OUTPUT';
-  category: string;
-  amount: number;
-  unit: string;
-  route?: string;
-  note?: string;
-}
-
-export interface IntakeOutputSummary {
-  totalIntake: number;
-  totalOutput: number;
-  balance: number;
-  records: IntakeOutputRecord[];
-}
-
 export const fetchIntakeOutputData = async (patientSSN: string): Promise<IntakeOutputSummary> => {
-  const apiUrl = 'http://3.6.230.54:4003/api/apiIntOutList.sh';
+  if (!patientSSN) {
+    throw new Error('Patient SSN is required');
+  }
+
+  const apiUrl = 'http://3.6.230.54:4003/api/apiIntakeOutput.sh';
   const requestBody = {
     UserName: 'CPRS-UAT',
-    Password: 'UAT@123',
+    PatientSSN: patientSSN,
     DUZ: '115',
-    PatientSSN: patientSSN || '670768354',
-    lname: '',
-    cpDOB: '',
-    mno: '',
-    cpIPNo: '',
-    SearchType: '2'
+    ihtLocation: 102,
+    FromDate: '',
+    ToDate: '',
+    Action: 'O',
   };
 
   try {
@@ -144,3 +133,21 @@ export const fetchIntakeOutputData = async (patientSSN: string): Promise<IntakeO
     throw error;
   }
 };
+
+export interface IntakeOutputRecord {
+  id: string;
+  timestamp: string;
+  type: 'INTAKE' | 'OUTPUT';
+  category: string;
+  amount: number;
+  unit: string;
+  route?: string;
+  note?: string;
+}
+
+export interface IntakeOutputSummary {
+  totalIntake: number;
+  totalOutput: number;
+  balance: number;
+  records: IntakeOutputRecord[];
+}
